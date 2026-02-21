@@ -1,0 +1,2221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Class Action Campaign Platform — Political Intelligence Prototype</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Georgia, serif; background: #0a0a0a; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useMemo } = React;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TRMNL 2 — Local Weather Reports
+// Political intelligence dashboard MVP
+//
+// DATA INTEGRITY RULE: Every source listed in this prototype is a real,
+// publicly accessible source that can be monitored via web scraping, RSS,
+// official APIs, or open data portals. No fabricated or unverifiable sources.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Verified Data Sources Registry ──────────────────────────────────────────
+// Each entry represents a real, automatable intelligence source.
+
+const SOURCE_REGISTRY = {
+  // ── Edinburgh / Scotland ──
+  "scot-parliament-official-report": {
+    name: "Scottish Parliament Official Report",
+    type: "parliamentary",
+    url: "https://www.parliament.scot/chamber-and-committees/official-report",
+    method: "Web scraping of publicly published verbatim transcripts (Hansard-equivalent). Updated after each parliamentary session.",
+    format: "HTML / PDF transcripts",
+    frequency: "Per sitting day (typically Tue–Thu)",
+    language: "English",
+    verifiable: true,
+  },
+  "scot-parliament-committees": {
+    name: "Scottish Parliament Committee Papers",
+    type: "parliamentary",
+    url: "https://www.parliament.scot/chamber-and-committees/committees",
+    method: "Scraping of committee meeting agendas, minutes, and evidence submissions. All publicly published.",
+    format: "HTML / PDF",
+    frequency: "Per committee meeting",
+    language: "English",
+    verifiable: true,
+  },
+  "edinburgh-council-minutes": {
+    name: "City of Edinburgh Council Meeting Minutes",
+    type: "government",
+    url: "https://democracy.edinburgh.gov.uk/ieListMeetings.aspx",
+    method: "Scraping of council and committee meeting minutes via the Modern.gov platform. Publicly accessible.",
+    format: "HTML / PDF",
+    frequency: "Per meeting cycle",
+    language: "English",
+    verifiable: true,
+  },
+  "scot-gov-publications": {
+    name: "Scottish Government Publications",
+    type: "government",
+    url: "https://www.gov.scot/publications/",
+    method: "RSS feed and web scraping of policy papers, consultations, and statistical releases.",
+    format: "HTML / PDF",
+    frequency: "Daily",
+    language: "English",
+    verifiable: true,
+  },
+  "theyworkforyou-scot": {
+    name: "TheyWorkForYou — Scottish Parliament",
+    type: "parliamentary",
+    url: "https://www.theyworkforyou.com/sp/",
+    method: "Structured API access to parsed parliamentary debates, votes, and member activity.",
+    format: "JSON API",
+    frequency: "Near real-time after sessions",
+    language: "English",
+    verifiable: true,
+  },
+  "scotsman": {
+    name: "The Scotsman",
+    type: "media",
+    url: "https://www.scotsman.com",
+    method: "RSS feed monitoring and web scraping of publicly accessible articles.",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "English",
+    verifiable: true,
+  },
+  "edinburgh-evening-news": {
+    name: "Edinburgh Evening News",
+    type: "media",
+    url: "https://www.edinburghnews.scotsman.com",
+    method: "RSS feed monitoring and web scraping of local news articles.",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "English",
+    verifiable: true,
+  },
+  "bbc-scotland": {
+    name: "BBC Scotland News",
+    type: "media",
+    url: "https://www.bbc.co.uk/news/scotland",
+    method: "RSS feed monitoring. BBC provides structured RSS feeds by region.",
+    format: "RSS",
+    frequency: "Continuous",
+    language: "English",
+    verifiable: true,
+  },
+  "the-national-scot": {
+    name: "The National (Scotland)",
+    type: "media",
+    url: "https://www.thenational.scot",
+    method: "RSS feed and web scraping of publicly accessible articles.",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "English",
+    verifiable: true,
+  },
+  "x-scotland-trends": {
+    name: "X (Twitter) — Scotland Political Hashtags",
+    type: "social",
+    url: "https://developer.x.com/en/docs",
+    method: "X API v2 — filtered stream and search endpoints tracking Scottish political hashtags, keywords, and geotagged posts.",
+    format: "JSON API (paid tier required)",
+    frequency: "Real-time stream",
+    language: "English",
+    verifiable: true,
+  },
+  "reddit-scotland": {
+    name: "Reddit — r/Scotland, r/Edinburgh",
+    type: "social",
+    url: "https://www.reddit.com/r/Scotland/",
+    method: "Reddit API (or Pushshift archives) for post and comment collection, sentiment analysis.",
+    format: "JSON API",
+    frequency: "Continuous",
+    language: "English",
+    verifiable: true,
+  },
+  "uk-parliament-petitions": {
+    name: "UK Parliament Petitions (Scotland-filtered)",
+    type: "government",
+    url: "https://petition.parliament.uk",
+    method: "Official JSON API with geographic filtering by constituency.",
+    format: "JSON API",
+    frequency: "Daily updates",
+    language: "English",
+    verifiable: true,
+  },
+  // ── Philadelphia / Pennsylvania ──
+  "phila-council-legislation": {
+    name: "Philadelphia City Council — Legistar",
+    type: "parliamentary",
+    url: "https://phila.legistar.com",
+    method: "Legistar API (Granicus) providing structured access to all legislation, resolutions, hearing transcripts, and votes.",
+    format: "JSON API / HTML",
+    frequency: "Per council session",
+    language: "English",
+    verifiable: true,
+  },
+  "pa-general-assembly": {
+    name: "Pennsylvania General Assembly",
+    type: "parliamentary",
+    url: "https://www.legis.state.pa.us",
+    method: "Web scraping of bill texts, committee schedules, session transcripts, and voting records.",
+    format: "HTML / PDF",
+    frequency: "Per session day",
+    language: "English",
+    verifiable: true,
+  },
+  "phila-inquirer": {
+    name: "The Philadelphia Inquirer",
+    type: "media",
+    url: "https://www.inquirer.com",
+    method: "RSS feed monitoring and scraping of publicly accessible articles. Some content paywalled.",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "English",
+    verifiable: true,
+  },
+  "whyy": {
+    name: "WHYY (NPR Philadelphia)",
+    type: "media",
+    url: "https://whyy.org",
+    method: "RSS feed monitoring. WHYY publishes full-text articles and transcripts freely.",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "English",
+    verifiable: true,
+  },
+  "billy-penn": {
+    name: "Billy Penn (WHYY local news)",
+    type: "media",
+    url: "https://billypenn.com",
+    method: "RSS feed monitoring. Freely accessible local news coverage.",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "English",
+    verifiable: true,
+  },
+  "phila-tribune": {
+    name: "The Philadelphia Tribune",
+    type: "media",
+    url: "https://www.phillytrib.com",
+    method: "RSS feed and web scraping. Oldest continuously published African-American newspaper.",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "English",
+    verifiable: true,
+  },
+  "septa-board": {
+    name: "SEPTA Board Meeting Minutes",
+    type: "government",
+    url: "https://www.septa.org/about/board/",
+    method: "Scraping of publicly posted board meeting agendas, minutes, and financial reports.",
+    format: "PDF",
+    frequency: "Monthly board meetings",
+    language: "English",
+    verifiable: true,
+  },
+  "phila-open-data": {
+    name: "OpenDataPhilly",
+    type: "data",
+    url: "https://opendataphilly.org",
+    method: "Public API / data catalog with structured datasets on city operations, budgets, and public safety.",
+    format: "CSV / JSON API",
+    frequency: "Varies by dataset",
+    language: "English",
+    verifiable: true,
+  },
+  "x-philly-trends": {
+    name: "X (Twitter) — Philadelphia Political Discourse",
+    type: "social",
+    url: "https://developer.x.com/en/docs",
+    method: "X API v2 — keyword and geofenced search for Philadelphia political conversation.",
+    format: "JSON API (paid tier required)",
+    frequency: "Real-time stream",
+    language: "English",
+    verifiable: true,
+  },
+  "reddit-philadelphia": {
+    name: "Reddit — r/philadelphia",
+    type: "social",
+    url: "https://www.reddit.com/r/philadelphia/",
+    method: "Reddit API for post/comment collection and sentiment analysis.",
+    format: "JSON API",
+    frequency: "Continuous",
+    language: "English",
+    verifiable: true,
+  },
+  "federal-register": {
+    name: "Federal Register",
+    type: "government",
+    url: "https://www.federalregister.gov/developers/documentation/api/v1",
+    method: "Official REST API for federal regulations, notices, and executive orders affecting Philadelphia.",
+    format: "JSON API",
+    frequency: "Daily",
+    language: "English",
+    verifiable: true,
+  },
+  // ── Oslo / Norway ──
+  "stortinget-transcripts": {
+    name: "Stortinget — Parliamentary Transcripts (Referater)",
+    type: "parliamentary",
+    url: "https://www.stortinget.no/no/Saker-og-publikasjoner/Publikasjoner/Referater/",
+    method: "Stortinget provides a public structured API (data.stortinget.no) with full session transcripts, votes, questions, and committee reports.",
+    format: "XML API / HTML",
+    frequency: "Per sitting day",
+    language: "Norwegian (Bokmål / Nynorsk) — machine-translatable",
+    verifiable: true,
+  },
+  "stortinget-api": {
+    name: "Stortinget Open Data API",
+    type: "parliamentary",
+    url: "https://data.stortinget.no",
+    method: "Official structured API. Provides access to representatives, votes, proposals, committee memberships, and session metadata.",
+    format: "XML / JSON API",
+    frequency: "Near real-time",
+    language: "Norwegian — machine-translatable",
+    verifiable: true,
+  },
+  "oslo-kommune": {
+    name: "Oslo Kommune — Bystyret (City Council)",
+    type: "government",
+    url: "https://www.oslo.kommune.no/politikk-og-administrasjon/bystyret/",
+    method: "Web scraping of council meeting minutes, agendas, and published decisions.",
+    format: "HTML / PDF",
+    frequency: "Per meeting cycle",
+    language: "Norwegian — machine-translatable",
+    verifiable: true,
+  },
+  "regjeringen-no": {
+    name: "Norwegian Government Publications (Regjeringen.no)",
+    type: "government",
+    url: "https://www.regjeringen.no/en/",
+    method: "RSS feeds and web scraping of white papers (Stortingsmeldinger), official Norwegian reports (NOU), press releases, and policy documents.",
+    format: "RSS / HTML / PDF",
+    frequency: "Daily",
+    language: "Norwegian + English translations available",
+    verifiable: true,
+  },
+  "aftenposten": {
+    name: "Aftenposten",
+    type: "media",
+    url: "https://www.aftenposten.no",
+    method: "RSS feed monitoring and web scraping. Norway's largest newspaper. Some content paywalled.",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "Norwegian — machine-translatable",
+    verifiable: true,
+  },
+  "vg-no": {
+    name: "VG (Verdens Gang)",
+    type: "media",
+    url: "https://www.vg.no",
+    method: "RSS feed monitoring. Norway's most-read online newspaper. Largely free access.",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "Norwegian — machine-translatable",
+    verifiable: true,
+  },
+  "nrk": {
+    name: "NRK (Norwegian Broadcasting Corporation)",
+    type: "media",
+    url: "https://www.nrk.no",
+    method: "RSS feeds and web scraping. Public broadcaster with freely accessible content.",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "Norwegian — machine-translatable",
+    verifiable: true,
+  },
+  "dagens-naeringsliv": {
+    name: "Dagens Næringsliv (DN)",
+    type: "media",
+    url: "https://www.dn.no",
+    method: "RSS feed monitoring. Leading business newspaper. Some content paywalled.",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "Norwegian — machine-translatable",
+    verifiable: true,
+  },
+  "e24": {
+    name: "E24",
+    type: "media",
+    url: "https://e24.no",
+    method: "RSS feed monitoring. Business/financial news portal (part of VG Media group).",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "Norwegian — machine-translatable",
+    verifiable: true,
+  },
+  "ssb-no": {
+    name: "Statistics Norway (SSB)",
+    type: "data",
+    url: "https://www.ssb.no/en/omssb/tjenester-og-verktoy/api",
+    method: "Official public JSON-stat API with structured economic, demographic, and social data.",
+    format: "JSON-stat API",
+    frequency: "Varies by dataset (monthly/quarterly/annual)",
+    language: "Norwegian + English",
+    verifiable: true,
+  },
+  "x-norway-trends": {
+    name: "X (Twitter) — Norwegian Political Discourse",
+    type: "social",
+    url: "https://developer.x.com/en/docs",
+    method: "X API v2 — language:no filtered stream, Norwegian political hashtags and keyword tracking.",
+    format: "JSON API (paid tier required)",
+    frequency: "Real-time stream",
+    language: "Norwegian — machine-translatable",
+    verifiable: true,
+  },
+  // ── Nairobi / Kenya ──
+  "kenya-hansard": {
+    name: "Kenya National Assembly Hansard",
+    type: "parliamentary",
+    url: "http://www.parliament.go.ke/the-national-assembly/hansard",
+    method: "Web scraping of published verbatim session transcripts.",
+    format: "PDF / HTML",
+    frequency: "Per sitting day",
+    language: "English / Swahili",
+    verifiable: true,
+  },
+  "kenya-senate-hansard": {
+    name: "Kenya Senate Hansard",
+    type: "parliamentary",
+    url: "http://www.parliament.go.ke/the-senate/hansard",
+    method: "Web scraping of published Senate session transcripts.",
+    format: "PDF / HTML",
+    frequency: "Per sitting day",
+    language: "English / Swahili",
+    verifiable: true,
+  },
+  "nairobi-county-assembly": {
+    name: "Nairobi County Assembly — Orders & Hansard",
+    type: "parliamentary",
+    url: "https://nairobiassembly.go.ke",
+    method: "Web scraping of published orders of the day, committee reports, and available transcripts.",
+    format: "HTML / PDF",
+    frequency: "Per sitting day",
+    language: "English / Swahili",
+    verifiable: true,
+  },
+  "kenya-gazette": {
+    name: "The Kenya Gazette",
+    type: "government",
+    url: "http://kenyalaw.org/kenya_gazette/",
+    method: "Web scraping via Kenya Law portal. Official record of government notices, appointments, and legal instruments.",
+    format: "PDF",
+    frequency: "Weekly (Fridays)",
+    language: "English",
+    verifiable: true,
+  },
+  "kenya-law": {
+    name: "Kenya Law — Bills Tracker",
+    type: "government",
+    url: "http://kenyalaw.org/kl/",
+    method: "Web scraping of bill texts, act summaries, and legal notices.",
+    format: "HTML / PDF",
+    frequency: "As published",
+    language: "English",
+    verifiable: true,
+  },
+  "nation-media": {
+    name: "Daily Nation (Nation Media Group)",
+    type: "media",
+    url: "https://nation.africa",
+    method: "RSS feed monitoring and web scraping. Kenya's largest media house.",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "English",
+    verifiable: true,
+  },
+  "the-standard-ke": {
+    name: "The Standard (Kenya)",
+    type: "media",
+    url: "https://www.standardmedia.co.ke",
+    method: "RSS feed monitoring and web scraping.",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "English",
+    verifiable: true,
+  },
+  "business-daily-africa": {
+    name: "Business Daily Africa",
+    type: "media",
+    url: "https://www.businessdailyafrica.com",
+    method: "RSS feed and web scraping. Part of Nation Media Group. Business/policy focus.",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "English",
+    verifiable: true,
+  },
+  "citizen-digital": {
+    name: "Citizen Digital (Royal Media Services)",
+    type: "media",
+    url: "https://www.citizen.digital",
+    method: "RSS feed and web scraping.",
+    format: "RSS / HTML",
+    frequency: "Continuous",
+    language: "English",
+    verifiable: true,
+  },
+  "taifa-leo": {
+    name: "Taifa Leo",
+    type: "media",
+    url: "https://www.mediamax.co.ke/taifa-leo",
+    method: "Web scraping. Kenya's leading Swahili-language daily newspaper.",
+    format: "HTML",
+    frequency: "Daily",
+    language: "Swahili — machine-translatable",
+    verifiable: true,
+  },
+  "x-kenya-trends": {
+    name: "X (Twitter) — Kenya Political Discourse",
+    type: "social",
+    url: "https://developer.x.com/en/docs",
+    method: "X API v2 — trending topics for Kenya (WOEID), Swahili + English keyword tracking, geotagged posts from Nairobi.",
+    format: "JSON API (paid tier required)",
+    frequency: "Real-time stream",
+    language: "English / Swahili / Sheng",
+    verifiable: true,
+  },
+  "tiktok-kenya": {
+    name: "TikTok — Kenya Political Content",
+    type: "social",
+    url: "https://developers.tiktok.com/doc/research-api-specs-query-videos",
+    method: "TikTok Research API — keyword and hashtag search for Kenyan political content. Requires approved researcher access.",
+    format: "JSON API (researcher access required)",
+    frequency: "Near real-time",
+    language: "English / Swahili",
+    verifiable: true,
+  },
+  "kenya-open-data": {
+    name: "Kenya Open Data Portal",
+    type: "data",
+    url: "https://www.opendata.go.ke",
+    method: "Public data portal with CKAN API access to government datasets.",
+    format: "CSV / JSON API",
+    frequency: "Varies by dataset",
+    language: "English",
+    verifiable: true,
+  },
+  "imf-kenya": {
+    name: "IMF — Kenya Country Data",
+    type: "data",
+    url: "https://www.imf.org/en/Countries/KEN",
+    method: "IMF public data API and web scraping of Article IV reports, program reviews, and press releases.",
+    format: "JSON API / PDF",
+    frequency: "Quarterly / per review cycle",
+    language: "English",
+    verifiable: true,
+  },
+};
+
+// ─── Market Data ─────────────────────────────────────────────────────────────
+
+const MARKETS = {
+  edinburgh: {
+    id: "edinburgh",
+    name: "Edinburgh",
+    country: "Scotland",
+    flag: "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+    coords: "55.9533° N, 3.1883° W",
+    timezone: "GMT+0",
+    lang: "en",
+    weatherCondition: "partly_cloudy",
+    weatherLabel: "Partly Cloudy",
+    stabilityIndex: 62,
+    trendDirection: "declining",
+    trendDelta: -4.2,
+    riskLevel: "medium",
+    accentColor: "#2563eb",
+    sources: {
+      parliamentary: [
+        "scot-parliament-official-report",
+        "scot-parliament-committees",
+        "theyworkforyou-scot",
+      ],
+      government: [
+        "edinburgh-council-minutes",
+        "scot-gov-publications",
+        "uk-parliament-petitions",
+      ],
+      media: [
+        "scotsman",
+        "edinburgh-evening-news",
+        "bbc-scotland",
+        "the-national-scot",
+      ],
+      social: ["x-scotland-trends", "reddit-scotland"],
+    },
+    sourceCounts: { parliamentary: 1247, media: 3891, social: 28450 },
+    sentimentBreakdown: { positive: 31, neutral: 42, negative: 27 },
+    keyTopics: [
+      {
+        topic: "Scottish Independence Referendum",
+        heat: 94,
+        trend: "rising",
+        slug: "scot-independence",
+        insightIds: [0],
+        sourcesUsed: [
+          "scot-parliament-official-report",
+          "scot-parliament-committees",
+          "theyworkforyou-scot",
+          "the-national-scot",
+          "bbc-scotland",
+          "scotsman",
+          "x-scotland-trends",
+          "reddit-scotland",
+        ],
+        sentiment: { positive: 44, neutral: 24, negative: 32 },
+        summary:
+          "Parliamentary language analysis of Holyrood transcripts reveals escalating use of mandate-framing by pro-independence MSPs. Media coverage volume has increased 35% in the past 30 days across monitored Scottish outlets.",
+      },
+      {
+        topic: "North Sea Energy Transition",
+        heat: 78,
+        trend: "stable",
+        slug: "north-sea-energy",
+        insightIds: [],
+        sourcesUsed: [
+          "scot-parliament-committees",
+          "scot-gov-publications",
+          "scotsman",
+          "bbc-scotland",
+          "x-scotland-trends",
+        ],
+        sentiment: { positive: 38, neutral: 41, negative: 21 },
+        summary:
+          "Scottish Government publications and committee evidence sessions show active policy development around just-transition funding. Media framing remains cautiously optimistic.",
+      },
+      {
+        topic: "NHS Scotland Funding",
+        heat: 71,
+        trend: "rising",
+        slug: "nhs-scotland",
+        insightIds: [],
+        sourcesUsed: [
+          "scot-parliament-official-report",
+          "scot-gov-publications",
+          "bbc-scotland",
+          "scotsman",
+          "edinburgh-evening-news",
+          "x-scotland-trends",
+        ],
+        sentiment: { positive: 14, neutral: 38, negative: 48 },
+        summary:
+          "Rising negative sentiment driven by waiting-time data in Scottish Government statistical releases. Parliamentary questions on NHS funding have increased 28% this quarter.",
+      },
+      {
+        topic: "Edinburgh Housing Crisis",
+        heat: 65,
+        trend: "rising",
+        slug: "edinburgh-housing",
+        insightIds: [1],
+        sourcesUsed: [
+          "edinburgh-council-minutes",
+          "edinburgh-evening-news",
+          "scotsman",
+          "reddit-scotland",
+          "x-scotland-trends",
+        ],
+        sentiment: { positive: 11, neutral: 33, negative: 56 },
+        summary:
+          "Edinburgh Council minutes show escalating committee attention to short-term lets and housing supply. Social media sentiment strongly negative, with r/Edinburgh housing threads showing 3x engagement vs baseline.",
+      },
+      {
+        topic: "ScotRail Service Reform",
+        heat: 48,
+        trend: "declining",
+        slug: "scotrail-reform",
+        insightIds: [],
+        sourcesUsed: [
+          "scot-parliament-official-report",
+          "scotsman",
+          "edinburgh-evening-news",
+          "bbc-scotland",
+        ],
+        sentiment: { positive: 22, neutral: 51, negative: 27 },
+        summary:
+          "Post-nationalization coverage normalizing. Parliamentary attention declining as initial reform scrutiny period passes. Media coverage volume down 22% month-over-month.",
+      },
+    ],
+    aiInsights: [
+      {
+        id: 0,
+        confidence: 78,
+        severity: "high",
+        category: "Legislative Risk",
+        title: "Independence Referendum Pressure Building",
+        summary:
+          "Analysis of Holyrood Official Report transcripts reveals a coordinated shift in SNP backbencher language from 'aspiration' framing to 'mandate' framing over the past 8 weeks. TheyWorkForYou voting pattern data shows increased party-line cohesion on constitutional questions.",
+        prediction:
+          "Elevated probability of formal referendum demand being tabled in the next parliamentary session cycle. Monitor committee agenda publications for scheduling signals.",
+        dataSources: [
+          {
+            sourceId: "scot-parliament-official-report",
+            detail: "NLP analysis of 847 transcript pages from the past 60 days. Keyword frequency tracking: 'mandate' usage +240%, 'aspiration' usage -65% in SNP member contributions.",
+          },
+          {
+            sourceId: "scot-parliament-committees",
+            detail: "Constitutional Affairs Committee evidence session transcripts. 3 recent sessions included extended discussion of referendum procedural mechanisms.",
+          },
+          {
+            sourceId: "theyworkforyou-scot",
+            detail: "Voting record API data showing 97.2% SNP cohesion rate on constitutional motions (up from 91.8% in prior quarter).",
+          },
+          {
+            sourceId: "the-national-scot",
+            detail: "74 articles in 30-day window referencing independence timeline. Editorial positioning analysis shows shift from speculative to anticipatory framing.",
+          },
+          {
+            sourceId: "bbc-scotland",
+            detail: "BBC Scotland political coverage tagged 'independence' — 23 articles in 30 days, up from 14 in prior period.",
+          },
+          {
+            sourceId: "x-scotland-trends",
+            detail: "#ScotRef and #IndyRef2 hashtag volume: 18,400 posts/week (7-day average), up 45% from 30-day baseline.",
+          },
+          {
+            sourceId: "reddit-scotland",
+            detail: "r/Scotland independence-tagged threads: average 342 comments per post (vs 180 baseline). Sentiment ratio 62% supportive.",
+          },
+        ],
+        timestamp: "2h ago",
+      },
+      {
+        id: 1,
+        confidence: 65,
+        severity: "medium",
+        category: "Regulatory Shift",
+        title: "Short-Term Let Licensing Expansion",
+        summary:
+          "Edinburgh Council planning committee minutes show unanimous support for extending licensing zones beyond the Old Town pilot. Local media coverage analysis indicates minimal organized opposition voices in published letters and opinion pieces.",
+        prediction:
+          "Likely expansion of short-term rental licensing requirements city-wide. Council committee scheduling suggests formal proposal within the current meeting cycle.",
+        dataSources: [
+          {
+            sourceId: "edinburgh-council-minutes",
+            detail: "Planning Committee minutes from last 3 meetings. Unanimous votes on licensing extension motions. No dissenting recorded statements.",
+          },
+          {
+            sourceId: "edinburgh-evening-news",
+            detail: "18 articles on short-term lets in 30-day window. Letters page analysis: 84% of published letters support tighter regulation.",
+          },
+          {
+            sourceId: "scotsman",
+            detail: "6 editorial/opinion pieces in past month. 5 of 6 editorially supportive of expanded licensing.",
+          },
+          {
+            sourceId: "reddit-scotland",
+            detail: "r/Edinburgh threads on Airbnb/short-term lets averaging 89% upvote ratio on pro-regulation comments.",
+          },
+          {
+            sourceId: "scot-gov-publications",
+            detail: "Scottish Government consultation response data on short-term lets: 72% of 4,200 respondents supported stricter licensing.",
+          },
+        ],
+        timestamp: "5h ago",
+      },
+    ],
+    recentAlerts: [
+      { text: "Holyrood emergency debate on energy prices scheduled", time: "34m ago", severity: "high" },
+      { text: "New polling data published: SNP +3 in Edinburgh constituencies", time: "2h ago", severity: "medium" },
+      { text: "Council budget amendment proposed for housing", time: "6h ago", severity: "low" },
+    ],
+    parliamentaryMood: { tension: 71, bipartisanship: 34, urgency: 68 },
+  },
+  philadelphia: {
+    id: "philadelphia",
+    name: "Philadelphia",
+    country: "Pennsylvania, USA",
+    flag: "🇺🇸",
+    coords: "39.9526° N, 75.1652° W",
+    timezone: "EST (UTC-5)",
+    lang: "en",
+    weatherCondition: "stormy",
+    weatherLabel: "Stormy",
+    stabilityIndex: 38,
+    trendDirection: "declining",
+    trendDelta: -11.3,
+    riskLevel: "high",
+    accentColor: "#dc2626",
+    sources: {
+      parliamentary: ["phila-council-legislation", "pa-general-assembly"],
+      government: ["septa-board", "phila-open-data", "federal-register"],
+      media: ["phila-inquirer", "whyy", "billy-penn", "phila-tribune"],
+      social: ["x-philly-trends", "reddit-philadelphia"],
+    },
+    sourceCounts: { parliamentary: 2103, media: 8742, social: 94200 },
+    sentimentBreakdown: { positive: 18, neutral: 35, negative: 47 },
+    keyTopics: [
+      {
+        topic: "Property Tax Reassessment",
+        heat: 88,
+        trend: "rising",
+        slug: "phila-property-tax",
+        insightIds: [0],
+        sourcesUsed: [
+          "phila-council-legislation",
+          "phila-inquirer",
+          "whyy",
+          "billy-penn",
+          "phila-open-data",
+          "x-philly-trends",
+          "reddit-philadelphia",
+        ],
+        sentiment: { positive: 8, neutral: 28, negative: 64 },
+        summary:
+          "Legistar records show 14 property-tax-related resolutions filed in the current session. Media coverage overwhelmingly negative. Social media engagement on tax topics is 5x baseline.",
+      },
+      {
+        topic: "SEPTA Funding Crisis",
+        heat: 82,
+        trend: "rising",
+        slug: "septa-funding",
+        insightIds: [1],
+        sourcesUsed: [
+          "pa-general-assembly",
+          "septa-board",
+          "phila-inquirer",
+          "whyy",
+          "billy-penn",
+          "x-philly-trends",
+          "reddit-philadelphia",
+        ],
+        sentiment: { positive: 12, neutral: 31, negative: 57 },
+        summary:
+          "PA General Assembly budget committee language and SEPTA board minutes both indicate a widening funding gap narrative. Reddit r/philadelphia SEPTA threads receive 4x typical engagement.",
+      },
+      {
+        topic: "Gun Violence Emergency",
+        heat: 79,
+        trend: "stable",
+        slug: "phila-gun-violence",
+        insightIds: [],
+        sourcesUsed: [
+          "phila-council-legislation",
+          "phila-inquirer",
+          "phila-tribune",
+          "whyy",
+          "phila-open-data",
+          "x-philly-trends",
+        ],
+        sentiment: { positive: 9, neutral: 32, negative: 59 },
+        summary:
+          "OpenDataPhilly crime incident data shows continued elevated levels. Council legislation tracker shows 7 active gun-violence-related bills. Media coverage volume steady at crisis-level baseline.",
+      },
+      {
+        topic: "Kensington Opioid Response",
+        heat: 67,
+        trend: "stable",
+        slug: "kensington-opioid",
+        insightIds: [],
+        sourcesUsed: [
+          "phila-council-legislation",
+          "phila-inquirer",
+          "billy-penn",
+          "whyy",
+          "x-philly-trends",
+          "reddit-philadelphia",
+        ],
+        sentiment: { positive: 15, neutral: 35, negative: 50 },
+        summary:
+          "Persistent coverage across all monitored Philadelphia outlets. Council hearing transcripts via Legistar show ongoing debate on intervention strategies.",
+      },
+      {
+        topic: "76ers Arena Development",
+        heat: 54,
+        trend: "declining",
+        slug: "sixers-arena",
+        insightIds: [],
+        sourcesUsed: [
+          "phila-council-legislation",
+          "phila-inquirer",
+          "billy-penn",
+          "reddit-philadelphia",
+        ],
+        sentiment: { positive: 34, neutral: 38, negative: 28 },
+        summary:
+          "Post-approval coverage declining in volume. Council legislation tracker shows procedural filings related to implementation. Public sentiment mixed but less intense.",
+      },
+    ],
+    aiInsights: [
+      {
+        id: 0,
+        confidence: 84,
+        severity: "critical",
+        category: "Fiscal Policy",
+        title: "Property Tax Shock Approaching",
+        summary:
+          "Philadelphia City Council Legistar records show bipartisan filing of 14 property-tax-related resolutions in the current session — an unusual volume that indicates cross-party constituent pressure. WHYY and Inquirer coverage has shifted from analytical to alarm-oriented framing. OpenDataPhilly property assessment data shows average assessment increases exceeding 30% in key zip codes.",
+        prediction:
+          "High probability of emergency tax relief legislation being fast-tracked. Legistar scheduling data suggests hearing dates being consolidated, a procedural signal of urgency.",
+        dataSources: [
+          {
+            sourceId: "phila-council-legislation",
+            detail: "Legistar API: 14 property-tax resolutions filed this session (vs 3 in equivalent prior period). 8 have bipartisan sponsors. 3 emergency hearings scheduled.",
+          },
+          {
+            sourceId: "phila-inquirer",
+            detail: "47 articles tagged 'property tax' in 30-day window. Sentiment analysis: 78% negative framing. Front-page placement 6 times.",
+          },
+          {
+            sourceId: "whyy",
+            detail: "12 segments on property reassessment in 30 days. Includes 4 investigative pieces analyzing zip-code-level impact data.",
+          },
+          {
+            sourceId: "billy-penn",
+            detail: "9 property tax articles. Notably, 3 personal-story-format pieces indicating editorial decision to humanize the issue.",
+          },
+          {
+            sourceId: "phila-open-data",
+            detail: "OPA property assessment dataset: median assessment increase of 31% in 19143, 19148, 19134 zip codes. Queried via OpenDataPhilly API.",
+          },
+          {
+            sourceId: "x-philly-trends",
+            detail: "#PhillyTax hashtag volume: 8,200 posts/week. Geotagged post density highest in South Philadelphia and Kensington.",
+          },
+          {
+            sourceId: "reddit-philadelphia",
+            detail: "r/philadelphia property tax threads averaging 450+ comments. Top-voted comments skew toward 'betrayal' and 'displacement' language.",
+          },
+        ],
+        timestamp: "1h ago",
+      },
+      {
+        id: 1,
+        confidence: 71,
+        severity: "high",
+        category: "Infrastructure",
+        title: "SEPTA Service Reduction Signals",
+        summary:
+          "Cross-referencing PA General Assembly budget committee hearing transcripts with SEPTA board meeting minutes reveals aligned 'funding gap' narratives being established simultaneously — a coordination pattern that typically precedes service reduction announcements. Federal Register shows no new FTA grant applications filed by SEPTA in the current quarter.",
+        prediction:
+          "Service reduction announcement likely within the next board meeting cycle. Monitor SEPTA board agendas for special session scheduling as a leading indicator.",
+        dataSources: [
+          {
+            sourceId: "pa-general-assembly",
+            detail: "Transportation Committee hearing transcripts: 'funding cliff' language used by 7 of 9 testifying members. Budget projection documents reference $240M shortfall.",
+          },
+          {
+            sourceId: "septa-board",
+            detail: "Board meeting minutes from last 2 sessions: CFO presentation slides reference 'service sustainability review.' Operations committee requested contingency planning report.",
+          },
+          {
+            sourceId: "phila-inquirer",
+            detail: "22 SEPTA-related articles in 30 days. 3 editorial board pieces urging state funding intervention.",
+          },
+          {
+            sourceId: "whyy",
+            detail: "7 SEPTA segments including 2 long-form investigative reports on ridership decline data.",
+          },
+          {
+            sourceId: "billy-penn",
+            detail: "5 articles. Rider-focused reporting. Comment sections averaging 120+ responses.",
+          },
+          {
+            sourceId: "federal-register",
+            detail: "FTA grant database query: no new SEPTA discretionary grant applications in current quarter. Prior year had 3 by this date.",
+          },
+          {
+            sourceId: "reddit-philadelphia",
+            detail: "r/philadelphia SEPTA threads: 12 posts with 200+ comments in past 30 days. Sentiment 71% negative. 'service cuts' keyword frequency up 180%.",
+          },
+        ],
+        timestamp: "4h ago",
+      },
+    ],
+    recentAlerts: [
+      { text: "Emergency City Council session on property tax called", time: "18m ago", severity: "critical" },
+      { text: "SEPTA ridership report shows steeper decline than projected", time: "1h ago", severity: "high" },
+      { text: "Mayor's office press briefing on public safety metrics", time: "3h ago", severity: "medium" },
+    ],
+    parliamentaryMood: { tension: 88, bipartisanship: 22, urgency: 91 },
+  },
+  oslo: {
+    id: "oslo",
+    name: "Oslo",
+    country: "Norway",
+    flag: "🇳🇴",
+    coords: "59.9139° N, 10.7522° E",
+    timezone: "CET (UTC+1)",
+    lang: "no",
+    translationActive: true,
+    weatherCondition: "clear",
+    weatherLabel: "Clear Skies",
+    stabilityIndex: 81,
+    trendDirection: "stable",
+    trendDelta: +1.1,
+    riskLevel: "low",
+    accentColor: "#0891b2",
+    sources: {
+      parliamentary: ["stortinget-transcripts", "stortinget-api"],
+      government: ["oslo-kommune", "regjeringen-no", "ssb-no"],
+      media: ["aftenposten", "vg-no", "nrk", "dagens-naeringsliv", "e24"],
+      social: ["x-norway-trends"],
+    },
+    sourceCounts: { parliamentary: 987, media: 2340, social: 15600 },
+    sentimentBreakdown: { positive: 48, neutral: 38, negative: 14 },
+    keyTopics: [
+      {
+        topic: "Oljefondets investeringsstrategi",
+        topicEn: "Oil Fund Investment Strategy",
+        heat: 72,
+        trend: "stable",
+        slug: "oil-fund-strategy",
+        insightIds: [1],
+        sourcesUsed: [
+          "stortinget-transcripts",
+          "stortinget-api",
+          "regjeringen-no",
+          "dagens-naeringsliv",
+          "e24",
+          "x-norway-trends",
+        ],
+        sentiment: { positive: 42, neutral: 44, negative: 14 },
+        summary:
+          "Stortinget finance committee transcripts and Finance Ministry publications show increased discussion of domestic allocation. Business media (DN, E24) providing analytical coverage.",
+      },
+      {
+        topic: "Bilfri sentrum",
+        topicEn: "Car-Free City Center",
+        heat: 68,
+        trend: "rising",
+        slug: "car-free-oslo",
+        insightIds: [],
+        sourcesUsed: [
+          "oslo-kommune",
+          "aftenposten",
+          "vg-no",
+          "nrk",
+          "x-norway-trends",
+        ],
+        sentiment: { positive: 52, neutral: 28, negative: 20 },
+        summary:
+          "Oslo Kommune bystyret minutes show active policy development. Media coverage balanced but trending positive. NRK providing regular feature coverage.",
+      },
+      {
+        topic: "Boligpriser i Oslo",
+        topicEn: "Oslo Housing Prices",
+        heat: 61,
+        trend: "stable",
+        slug: "oslo-housing",
+        insightIds: [],
+        sourcesUsed: [
+          "ssb-no",
+          "oslo-kommune",
+          "aftenposten",
+          "e24",
+          "x-norway-trends",
+        ],
+        sentiment: { positive: 18, neutral: 48, negative: 34 },
+        summary:
+          "SSB housing price index data forms analytical baseline. Media coverage analytical rather than alarmist. Social media sentiment more negative than media framing.",
+      },
+      {
+        topic: "Regulering av delingstjenester",
+        topicEn: "Ride-Sharing Regulation",
+        heat: 55,
+        trend: "rising",
+        slug: "rideshare-regulation",
+        insightIds: [0],
+        sourcesUsed: [
+          "stortinget-transcripts",
+          "stortinget-api",
+          "aftenposten",
+          "vg-no",
+          "x-norway-trends",
+        ],
+        sentiment: { positive: 30, neutral: 45, negative: 25 },
+        summary:
+          "Stortinget transport committee transcript analysis reveals linguistic hardening toward regulatory action. Cross-party editorial alignment detected in Aftenposten and VG opinion sections.",
+      },
+      {
+        topic: "Integrering og innvandring",
+        topicEn: "Integration & Immigration",
+        heat: 49,
+        trend: "rising",
+        slug: "oslo-integration",
+        insightIds: [],
+        sourcesUsed: [
+          "stortinget-transcripts",
+          "regjeringen-no",
+          "nrk",
+          "aftenposten",
+          "vg-no",
+          "ssb-no",
+        ],
+        sentiment: { positive: 28, neutral: 40, negative: 32 },
+        summary:
+          "Government white papers and SSB demographic data providing factual backdrop. Parliamentary debate frequency increasing. Media coverage balanced across political spectrum.",
+      },
+    ],
+    aiInsights: [
+      {
+        id: 0,
+        confidence: 73,
+        severity: "medium",
+        category: "Regulatory Shift",
+        title: "Ride-Sharing Regulation Tightening",
+        summary:
+          'Stortinget transport committee transcripts (sourced via data.stortinget.no API) show a detectable linguistic shift from "vurdere regulering" (consider regulation) to "innføre rammeverk" (implement framework) over the past 6 weeks. Aftenposten and VG opinion sections show editorial alignment across the political spectrum on this issue.',
+        prediction:
+          "Regulatory framework proposal likely to advance through committee stage. Stortinget API scheduling data will provide the earliest signal of floor debate timing.",
+        dataSources: [
+          {
+            sourceId: "stortinget-transcripts",
+            detail: 'Transport committee session transcripts: "innføre rammeverk" phrase frequency increased from 2 to 14 occurrences across 4 sessions. 8 different representatives used the phrase.',
+          },
+          {
+            sourceId: "stortinget-api",
+            detail: "Structured vote data shows 3 preliminary committee votes on transport regulation with cross-party majority support (Ap + H + Sp alignment).",
+          },
+          {
+            sourceId: "aftenposten",
+            detail: "4 opinion/editorial pieces on ride-sharing in 30-day window. All 4 editorially supportive of regulation. Zero published op-eds opposing.",
+          },
+          {
+            sourceId: "vg-no",
+            detail: "7 articles referencing ride-sharing regulation. News framing shifted from 'debate' to 'when, not if' narrative structure.",
+          },
+          {
+            sourceId: "x-norway-trends",
+            detail: "Norwegian-language X posts mentioning 'Uber' + 'regulering': 2,400 in past 30 days. Sentiment: 58% supportive of regulation.",
+          },
+        ],
+        timestamp: "3h ago",
+        translatedFrom: "Norwegian (Bokmål)",
+      },
+      {
+        id: 1,
+        confidence: 59,
+        severity: "low",
+        category: "Investment Climate",
+        title: "Sovereign Wealth Fund Domestic Pivot Signal",
+        summary:
+          'Detected rhetorical pattern change in Finance Ministry publications (regjeringen.no): the phrase "innenlandsk verdiskaping" (domestic value creation) appeared with significantly increased frequency in Q4 vs Q3 documents. Stortinget finance committee transcripts show aligned discussion themes. Dagens Næringsliv and E24 have begun analytical coverage of domestic allocation scenarios.',
+        prediction:
+          "Early-stage policy signal. Monitor Stortinget finance committee agenda and regjeringen.no publication calendar for formal proposal indicators.",
+        dataSources: [
+          {
+            sourceId: "regjeringen-no",
+            detail: '"innenlandsk verdiskaping" phrase tracking across Finance Ministry publications: 34 instances in Q4 documents vs 8 in Q3. Contextual analysis confirms policy-signaling usage.',
+          },
+          {
+            sourceId: "stortinget-transcripts",
+            detail: "Finance committee session transcripts: 5 members raised domestic investment allocation in questions to the Finance Minister across 3 sessions.",
+          },
+          {
+            sourceId: "stortinget-api",
+            detail: "Written question (skriftlig spørsmål) data: 7 questions filed to Finance Ministry on oil fund domestic allocation rules in current session.",
+          },
+          {
+            sourceId: "dagens-naeringsliv",
+            detail: "3 analytical features on oil fund allocation strategy in past 30 days. Sourcing includes unnamed ministry officials.",
+          },
+          {
+            sourceId: "e24",
+            detail: "5 articles on sovereign wealth fund strategy. Comment section analysis: 340 comments, 61% expressing interest in domestic investment shift.",
+          },
+          {
+            sourceId: "ssb-no",
+            detail: "SSB investment statistics API: baseline data on current NBIM allocation percentages used for contextual analysis.",
+          },
+        ],
+        timestamp: "7h ago",
+        translatedFrom: "Norwegian (Bokmål)",
+      },
+    ],
+    recentAlerts: [
+      { text: "Stortinget committee vote on digital services tax — passed", time: "1h ago", severity: "medium" },
+      { text: "Oslo bystyre housing debate concluded", time: "4h ago", severity: "low" },
+      { text: "New integration policy white paper published on regjeringen.no", time: "8h ago", severity: "low" },
+    ],
+    parliamentaryMood: { tension: 29, bipartisanship: 74, urgency: 35 },
+  },
+  nairobi: {
+    id: "nairobi",
+    name: "Nairobi",
+    country: "Kenya",
+    flag: "🇰🇪",
+    coords: "1.2921° S, 36.8219° E",
+    timezone: "EAT (UTC+3)",
+    lang: "sw/en",
+    weatherCondition: "turbulent",
+    weatherLabel: "Turbulent",
+    stabilityIndex: 44,
+    trendDirection: "volatile",
+    trendDelta: -8.7,
+    riskLevel: "high",
+    accentColor: "#b91c1c",
+    sources: {
+      parliamentary: [
+        "kenya-hansard",
+        "kenya-senate-hansard",
+        "nairobi-county-assembly",
+      ],
+      government: ["kenya-gazette", "kenya-law", "kenya-open-data", "imf-kenya"],
+      media: [
+        "nation-media",
+        "the-standard-ke",
+        "business-daily-africa",
+        "citizen-digital",
+        "taifa-leo",
+      ],
+      social: ["x-kenya-trends", "tiktok-kenya"],
+    },
+    sourceCounts: { parliamentary: 1580, media: 5120, social: 67800 },
+    sentimentBreakdown: { positive: 22, neutral: 30, negative: 48 },
+    keyTopics: [
+      {
+        topic: "Finance Bill Tax Protests",
+        heat: 96,
+        trend: "rising",
+        slug: "kenya-finance-bill",
+        insightIds: [0],
+        sourcesUsed: [
+          "kenya-hansard",
+          "kenya-senate-hansard",
+          "kenya-law",
+          "nation-media",
+          "the-standard-ke",
+          "citizen-digital",
+          "taifa-leo",
+          "x-kenya-trends",
+          "tiktok-kenya",
+        ],
+        sentiment: { positive: 8, neutral: 18, negative: 74 },
+        summary:
+          "Multi-lingual analysis across Swahili and English sources reveals intense opposition. Kenya Hansard shows opposition coalition deploying procedural blocking language. X and TikTok amplification patterns match historical protest-mobilization signatures.",
+      },
+      {
+        topic: "Nairobi Expressway Tolls",
+        heat: 74,
+        trend: "stable",
+        slug: "nairobi-expressway",
+        insightIds: [1],
+        sourcesUsed: [
+          "nairobi-county-assembly",
+          "business-daily-africa",
+          "nation-media",
+          "taifa-leo",
+          "x-kenya-trends",
+        ],
+        sentiment: { positive: 16, neutral: 35, negative: 49 },
+        summary:
+          "Sentiment divergence detected between English-language business media (cautiously analytical) and Swahili-language discourse (strongly opposed). County Assembly transcripts show growing backbench criticism.",
+      },
+      {
+        topic: "Affordable Housing Levy",
+        heat: 70,
+        trend: "rising",
+        slug: "affordable-housing-ke",
+        insightIds: [],
+        sourcesUsed: [
+          "kenya-hansard",
+          "kenya-law",
+          "nation-media",
+          "the-standard-ke",
+          "business-daily-africa",
+          "x-kenya-trends",
+        ],
+        sentiment: { positive: 20, neutral: 30, negative: 50 },
+        summary:
+          "Kenya Law bills tracker shows active amendments. Hansard records indicate ongoing parliamentary debate. Media coverage framing connects to broader Finance Bill opposition narrative.",
+      },
+      {
+        topic: "Digital Services Tax",
+        heat: 63,
+        trend: "stable",
+        slug: "kenya-dst",
+        insightIds: [],
+        sourcesUsed: [
+          "kenya-hansard",
+          "kenya-gazette",
+          "business-daily-africa",
+          "nation-media",
+          "imf-kenya",
+        ],
+        sentiment: { positive: 25, neutral: 42, negative: 33 },
+        summary:
+          "Kenya Gazette notices and Business Daily reporting indicate implementation phase. IMF Article IV review documents provide international policy context. Parliamentary attention moderate.",
+      },
+      {
+        topic: "Devolution Funding Disputes",
+        heat: 58,
+        trend: "rising",
+        slug: "devolution-funding",
+        insightIds: [],
+        sourcesUsed: [
+          "kenya-senate-hansard",
+          "nairobi-county-assembly",
+          "nation-media",
+          "the-standard-ke",
+          "kenya-open-data",
+        ],
+        sentiment: { positive: 14, neutral: 36, negative: 50 },
+        summary:
+          "Senate Hansard shows intensifying county-vs-national funding debates. County Assembly minutes reflect budget frustration. Kenya Open Data budget datasets provide baseline allocation figures.",
+      },
+    ],
+    aiInsights: [
+      {
+        id: 0,
+        confidence: 88,
+        severity: "critical",
+        category: "Civil Unrest Risk",
+        title: "Finance Bill Opposition Crystallizing",
+        summary:
+          "Multi-lingual NLP analysis across Swahili and English social media reveals protest coordination patterns. Kenya National Assembly Hansard shows opposition coalition using identical procedural language patterns observed in historical pre-crisis periods. X API trending data and TikTok Research API content show accelerating amplification networks.",
+        prediction:
+          "High probability of organized mass action if bill proceeds to third reading without substantial amendment. Monitor Kenya Gazette for emergency legislative scheduling notices.",
+        dataSources: [
+          {
+            sourceId: "kenya-hansard",
+            detail: "National Assembly Hansard: opposition procedural motions increased 300% in current session. Linguistic analysis shows coordinated use of constitutional challenge language across 12 opposition members.",
+          },
+          {
+            sourceId: "kenya-senate-hansard",
+            detail: "Senate session transcripts show 8 senators filing statements opposing Finance Bill provisions. Cross-party concern emerging on specific clauses.",
+          },
+          {
+            sourceId: "kenya-law",
+            detail: "Bills tracker: 6 proposed amendments to Finance Bill filed. 4 address the most-protested provisions. Amendment text analysis shows strategic targeting.",
+          },
+          {
+            sourceId: "nation-media",
+            detail: "Daily Nation: 52 Finance Bill articles in 30 days. Front-page placement 11 times. Editorial board has published 3 pieces urging dialogue.",
+          },
+          {
+            sourceId: "the-standard-ke",
+            detail: "38 articles in 30-day window. Coverage includes 5 investigative pieces on bill impact analysis.",
+          },
+          {
+            sourceId: "citizen-digital",
+            detail: "24 articles + 8 video segments. Highest engagement metrics on citizen-reaction content.",
+          },
+          {
+            sourceId: "taifa-leo",
+            detail: "Swahili-language coverage: 18 articles. Sentiment analysis of Swahili text shows 82% negative framing — stronger than English-language equivalents.",
+          },
+          {
+            sourceId: "x-kenya-trends",
+            detail: "Kenya X trending data: Finance Bill hashtags held #1-#3 positions for 14 of past 30 days. Post volume: 94,000 posts/week. Geotagged Nairobi post density 6x baseline.",
+          },
+          {
+            sourceId: "tiktok-kenya",
+            detail: "TikTok Research API: 2,800 Kenya-geotagged videos referencing Finance Bill in 30 days. Average engagement rate 340% above creator baselines. Protest-coordination content detected.",
+          },
+        ],
+        timestamp: "45m ago",
+      },
+      {
+        id: 1,
+        confidence: 66,
+        severity: "high",
+        category: "Trade & Investment",
+        title: "Nairobi Expressway Toll Restructuring",
+        summary:
+          "Detected sentiment divergence between English-language business media (Business Daily: cautiously analytical) and Swahili-language sources (Taifa Leo, X Swahili posts: strongly opposed). County Assembly of Nairobi transcripts show backbench rebellion language emerging against the current toll structure.",
+        prediction:
+          "Toll restructuring or reduction likely to enter formal political negotiation. County Assembly agenda publications will be the leading indicator.",
+        dataSources: [
+          {
+            sourceId: "nairobi-county-assembly",
+            detail: "County Assembly Hansard: 4 motions filed questioning toll structure. Committee of Transport recorded 3 critical statements from ruling-coalition members.",
+          },
+          {
+            sourceId: "business-daily-africa",
+            detail: "14 articles on expressway economics in 30 days. Analytical tone. Financial modeling coverage suggests toll revenue below original PPP projections.",
+          },
+          {
+            sourceId: "nation-media",
+            detail: "19 articles including 3 editorial pieces. Coverage framing: public frustration vs infrastructure investment tradeoff.",
+          },
+          {
+            sourceId: "taifa-leo",
+            detail: "Swahili-language coverage: 8 articles with 91% negative sentiment — significantly more critical than English-language business media coverage.",
+          },
+          {
+            sourceId: "x-kenya-trends",
+            detail: "Expressway-related posts: 4,200/week. Swahili-language posts 78% negative vs English-language posts 52% negative — revealing a sentiment gap across language communities.",
+          },
+        ],
+        timestamp: "3h ago",
+      },
+    ],
+    recentAlerts: [
+      { text: "National Assembly committee rejects Finance Bill amendment", time: "22m ago", severity: "critical" },
+      { text: "Protest hashtag trending #1 on Kenyan X", time: "1h ago", severity: "high" },
+      { text: "IMF delegation meeting with Treasury CS confirmed", time: "5h ago", severity: "medium" },
+    ],
+    parliamentaryMood: { tension: 85, bipartisanship: 18, urgency: 92 },
+  },
+};
+
+const WEATHER_META = {
+  clear: { icon: "☀️", label: "Clear Skies", badgeBg: "#dcfce7", badgeText: "#166534", barColor: "#22c55e" },
+  partly_cloudy: { icon: "⛅", label: "Partly Cloudy", badgeBg: "#fef9c3", badgeText: "#854d0e", barColor: "#ca8a04" },
+  stormy: { icon: "⛈️", label: "Stormy", badgeBg: "#fee2e2", badgeText: "#991b1b", barColor: "#dc2626" },
+  turbulent: { icon: "🌪️", label: "Turbulent", badgeBg: "#ffedd5", badgeText: "#9a3412", barColor: "#ea580c" },
+};
+
+const SEVERITY_STYLES = {
+  low: { bg: "#f0fdf4", text: "#166534", border: "#bbf7d0", dot: "#22c55e" },
+  medium: { bg: "#fefce8", text: "#854d0e", border: "#fde68a", dot: "#ca8a04" },
+  high: { bg: "#fff7ed", text: "#9a3412", border: "#fed7aa", dot: "#ea580c" },
+  critical: { bg: "#fef2f2", text: "#991b1b", border: "#fecaca", dot: "#dc2626" },
+};
+
+const SOURCE_TYPE_LABELS = {
+  parliamentary: { label: "Parliamentary", icon: "🏛️", color: "#4338ca" },
+  government: { label: "Government", icon: "📋", color: "#0369a1" },
+  media: { label: "Media", icon: "📰", color: "#b45309" },
+  social: { label: "Social", icon: "💬", color: "#0f766e" },
+  data: { label: "Open Data", icon: "📊", color: "#7c3aed" },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UI COMPONENTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const P = {
+  bg: "#FAFAF7",
+  surface: "#FFFFFF",
+  surfaceAlt: "#F5F5F0",
+  text: "#1a1a1a",
+  textSecondary: "#6b7280",
+  textTertiary: "#9ca3af",
+  border: "#e5e5e0",
+  borderLight: "#f0f0eb",
+};
+
+function Badge({ children, bg, color, style: s = {} }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        fontSize: 10,
+        fontWeight: 600,
+        letterSpacing: 0.8,
+        textTransform: "uppercase",
+        padding: "3px 8px",
+        borderRadius: 4,
+        background: bg || P.surfaceAlt,
+        color: color || P.textSecondary,
+        ...s,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function SentimentBar({ positive, neutral, negative, compact = false }) {
+  const h = compact ? 4 : 6;
+  return (
+    <div>
+      <div style={{ display: "flex", height: h, borderRadius: h / 2, overflow: "hidden", background: P.borderLight }}>
+        <div style={{ width: `${positive}%`, background: "#22c55e", transition: "width 0.8s" }} />
+        <div style={{ width: `${neutral}%`, background: "#94a3b8", transition: "width 0.8s" }} />
+        <div style={{ width: `${negative}%`, background: "#ef4444", transition: "width 0.8s" }} />
+      </div>
+      {!compact && (
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: P.textTertiary, marginTop: 6 }}>
+          <span style={{ color: "#16a34a" }}>{positive}% positive</span>
+          <span>{neutral}% neutral</span>
+          <span style={{ color: "#dc2626" }}>{negative}% negative</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MoodMeter({ label, value }) {
+  const color = value > 70 ? "#dc2626" : value > 45 ? "#ca8a04" : "#16a34a";
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+        <span style={{ fontSize: 12, color: P.textSecondary }}>{label}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color, fontFamily: "'IBM Plex Mono', monospace" }}>{value}</span>
+      </div>
+      <div style={{ height: 4, background: P.borderLight, borderRadius: 2 }}>
+        <div style={{ height: "100%", width: `${value}%`, background: color, borderRadius: 2, transition: "width 0.8s" }} />
+      </div>
+    </div>
+  );
+}
+
+function StabilityArc({ value, accent }) {
+  const size = 140;
+  const r = 54;
+  const circ = Math.PI * r;
+  const offset = circ - (value / 100) * circ;
+  const col = value > 70 ? "#16a34a" : value > 50 ? "#ca8a04" : value > 30 ? "#ea580c" : "#dc2626";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <svg width={size} height={80} viewBox={`0 0 ${size} 80`}>
+        <path d={`M 16 72 A ${r} ${r} 0 0 1 ${size - 16} 72`} fill="none" stroke={P.borderLight} strokeWidth="10" strokeLinecap="round" />
+        <path d={`M 16 72 A ${r} ${r} 0 0 1 ${size - 16} 72`} fill="none" stroke={col} strokeWidth="10" strokeLinecap="round"
+          strokeDasharray={circ} strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 1s ease, stroke 0.5s" }} />
+      </svg>
+      <div style={{ marginTop: -18, textAlign: "center" }}>
+        <div style={{ fontSize: 32, fontWeight: 800, color: col, fontFamily: "'IBM Plex Mono', monospace", lineHeight: 1 }}>{value}</div>
+        <div style={{ fontSize: 9, color: P.textTertiary, letterSpacing: 2, textTransform: "uppercase", marginTop: 4 }}>Stability Index</div>
+      </div>
+    </div>
+  );
+}
+
+function SourceDetailCard({ sourceId, detail }) {
+  const src = SOURCE_REGISTRY[sourceId];
+  if (!src) return null;
+  const typeInfo = SOURCE_TYPE_LABELS[src.type] || { label: src.type, icon: "📄", color: "#6b7280" };
+  return (
+    <div style={{
+      padding: 14, background: P.surfaceAlt, borderRadius: 8, border: `1px solid ${P.border}`,
+      animation: "fadeIn 0.3s ease",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 14 }}>{typeInfo.icon}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: P.text }}>{src.name}</div>
+          <div style={{ fontSize: 10, color: typeInfo.color, fontWeight: 600 }}>{typeInfo.label}</div>
+        </div>
+        <Badge bg={`${typeInfo.color}12`} color={typeInfo.color}>{src.method.split('.')[0].substring(0, 30)}</Badge>
+      </div>
+      <p style={{ margin: "0 0 8px", fontSize: 12, color: P.text, lineHeight: 1.6, fontStyle: "italic" }}>
+        "{detail}"
+      </p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 10, color: P.textTertiary }}>
+        <span>URL: <a href={src.url} target="_blank" rel="noopener" style={{ color: typeInfo.color, textDecoration: "none" }}>{src.url}</a></span>
+        <span>Format: {src.format}</span>
+        <span>Frequency: {src.frequency}</span>
+        <span>Lang: {src.language}</span>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VIEWS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function DashboardView({ market, onTopicClick, onInsightExpand, expandedInsight, dataView, setDataView }) {
+  const w = WEATHER_META[market.weatherCondition];
+  const trendColor = market.trendDelta > 0 ? "#16a34a" : market.trendDelta < -8 ? "#dc2626" : "#ca8a04";
+  const trendArrow = market.trendDelta > 0 ? "↑" : market.trendDelta < -5 ? "↓" : "→";
+  const allSourceIds = [
+    ...(market.sources.parliamentary || []),
+    ...(market.sources.government || []),
+    ...(market.sources.media || []),
+    ...(market.sources.social || []),
+  ];
+
+  return (
+    <div>
+      {/* Hero row */}
+      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 1fr", gap: 16, marginBottom: 20 }}>
+        {/* Weather card */}
+        <div style={{
+          background: P.surface, border: `1px solid ${P.border}`, borderRadius: 12, padding: 24,
+          display: "flex", alignItems: "center", gap: 20,
+        }}>
+          <div style={{ fontSize: 56, animation: "float 3s ease-in-out infinite" }}>{w.icon}</div>
+          <div>
+            <Badge bg={w.badgeBg} color={w.badgeText} style={{ marginBottom: 8 }}>{w.label}</Badge>
+            <div style={{ fontSize: 22, fontWeight: 700, color: P.text, marginBottom: 4 }}>
+              {market.name} <span style={{ fontWeight: 400, color: P.textSecondary, fontSize: 14 }}>{market.country}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{
+                fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600, color: trendColor,
+                background: `${trendColor}10`, padding: "2px 8px", borderRadius: 4,
+              }}>
+                {trendArrow} {market.trendDelta > 0 ? "+" : ""}{market.trendDelta} <span style={{ color: P.textTertiary, fontWeight: 400 }}>7d</span>
+              </span>
+              <Badge bg={SEVERITY_STYLES[market.riskLevel].bg} color={SEVERITY_STYLES[market.riskLevel].text}>
+                {market.riskLevel} risk
+              </Badge>
+            </div>
+          </div>
+        </div>
+
+        {/* Stability */}
+        <div style={{
+          background: P.surface, border: `1px solid ${P.border}`, borderRadius: 12, padding: 20,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        }}>
+          <StabilityArc value={market.stabilityIndex} accent={market.accentColor} />
+        </div>
+
+        {/* Sources */}
+        <div style={{ background: P.surface, border: `1px solid ${P.border}`, borderRadius: 12, padding: 20 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: P.textTertiary, letterSpacing: 2, textTransform: "uppercase", marginBottom: 14 }}>
+            Intelligence Sources
+          </div>
+          <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
+            {[
+              { icon: "🏛️", label: "Parliament", count: market.sourceCounts.parliamentary },
+              { icon: "📰", label: "Media", count: market.sourceCounts.media },
+              { icon: "💬", label: "Social", count: market.sourceCounts.social },
+            ].map((s, i) => (
+              <div key={i} style={{ flex: 1, textAlign: "center" }}>
+                <div style={{ fontSize: 14, marginBottom: 2 }}>{s.icon}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: P.text, fontFamily: "'IBM Plex Mono', monospace" }}>{s.count.toLocaleString()}</div>
+                <div style={{ fontSize: 9, color: P.textTertiary, letterSpacing: 1, textTransform: "uppercase" }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+          {(market.translationActive || market.lang === "sw/en") && (
+            <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "8px 10px", display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 13 }}>🌐</span>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#1e40af" }}>
+                  {market.translationActive ? "Norwegian → English Active" : "Swahili + English Analysis"}
+                </div>
+                <div style={{ fontSize: 10, color: "#3b82f6" }}>
+                  {market.translationActive ? "Bokmål + Nynorsk • Subtext analysis in source language" : "Cross-language sentiment calibration"}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 2, marginBottom: 16, borderBottom: `1px solid ${P.border}`, paddingBottom: 1 }}>
+        {[
+          { key: "insights", label: "AI Insights" },
+          { key: "topics", label: "Hot Topics" },
+          { key: "alerts", label: "Alert Feed" },
+          { key: "mood", label: "Parliamentary Mood" },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setDataView(tab.key)}
+            style={{
+              padding: "10px 18px", borderRadius: "8px 8px 0 0",
+              background: dataView === tab.key ? P.surface : "transparent",
+              border: dataView === tab.key ? `1px solid ${P.border}` : "1px solid transparent",
+              borderBottom: dataView === tab.key ? `2px solid ${P.surface}` : "2px solid transparent",
+              marginBottom: -2,
+              color: dataView === tab.key ? P.text : P.textTertiary,
+              fontSize: 13, fontWeight: dataView === tab.key ? 600 : 400,
+              cursor: "pointer", outline: "none", fontFamily: "inherit",
+            }}
+          >
+            {tab.label}
+            {tab.key === "alerts" && (
+              <span style={{
+                marginLeft: 6, fontSize: 9, background: "#dc2626", color: "#fff",
+                padding: "1px 6px", borderRadius: 10, fontWeight: 700,
+              }}>
+                {market.recentAlerts.length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Main content grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "5fr 2fr", gap: 16 }}>
+        <div>
+          {/* AI INSIGHTS */}
+          {dataView === "insights" && market.aiInsights.map((insight, idx) => {
+            const sev = SEVERITY_STYLES[insight.severity];
+            const isExpanded = expandedInsight === insight.id;
+            return (
+              <div key={insight.id} style={{
+                background: P.surface, border: `1px solid ${P.border}`,
+                borderLeft: `4px solid ${sev.dot}`, borderRadius: 10,
+                padding: 20, marginBottom: 14, cursor: "pointer",
+                transition: "box-shadow 0.2s",
+                boxShadow: isExpanded ? "0 4px 24px rgba(0,0,0,0.06)" : "none",
+              }}
+                onClick={() => onInsightExpand(isExpanded ? null : insight.id)}
+                onMouseEnter={e => e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.04)"}
+                onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.boxShadow = "none"; }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    <Badge bg={sev.bg} color={sev.text}>{insight.severity}</Badge>
+                    <Badge>{insight.category}</Badge>
+                    {insight.translatedFrom && <Badge bg="#eff6ff" color="#1e40af">🌐 {insight.translatedFrom}</Badge>}
+                  </div>
+                  <div style={{
+                    width: 38, height: 38, borderRadius: "50%", border: `2px solid ${sev.dot}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 13, fontWeight: 700, color: sev.dot, fontFamily: "'IBM Plex Mono', monospace",
+                    flexShrink: 0,
+                  }}>
+                    {insight.confidence}
+                  </div>
+                </div>
+                <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700, color: P.text, lineHeight: 1.4, fontFamily: "'Source Serif 4', Georgia, serif" }}>
+                  {insight.title}
+                </h3>
+                <p style={{ margin: 0, fontSize: 13, color: P.textSecondary, lineHeight: 1.7 }}>{insight.summary}</p>
+
+                {isExpanded && (
+                  <div style={{ marginTop: 16, borderTop: `1px solid ${P.border}`, paddingTop: 16, animation: "fadeIn 0.3s ease" }}>
+                    <div style={{ background: `${sev.dot}08`, border: `1px solid ${sev.dot}20`, borderRadius: 8, padding: 14, marginBottom: 16 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: sev.dot, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 4 }}>
+                        AI Prediction
+                      </div>
+                      <div style={{ fontSize: 14, color: P.text, lineHeight: 1.6 }}>{insight.prediction}</div>
+                    </div>
+
+                    <div style={{ fontSize: 11, fontWeight: 700, color: P.text, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12 }}>
+                      Verified Data Sources ({insight.dataSources.length})
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {insight.dataSources.map((ds, i) => (
+                        <SourceDetailCard key={i} sourceId={ds.sourceId} detail={ds.detail} />
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 10, color: P.textTertiary, marginTop: 12 }}>Analysis generated {insight.timestamp}</div>
+                  </div>
+                )}
+                <div style={{ fontSize: 10, color: P.textTertiary, marginTop: 10, textAlign: "right" }}>
+                  {isExpanded ? "Click to collapse" : `Click to see ${insight.dataSources.length} verified sources →`}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* HOT TOPICS */}
+          {dataView === "topics" && (
+            <div style={{ background: P.surface, border: `1px solid ${P.border}`, borderRadius: 10, padding: 20 }}>
+              {market.keyTopics.map((t, i) => {
+                const heatColor = t.heat > 80 ? "#dc2626" : t.heat > 60 ? "#ea580c" : t.heat > 40 ? "#ca8a04" : "#16a34a";
+                const trendIcon = t.trend === "rising" ? "↑" : t.trend === "declining" ? "↓" : "→";
+                const trendCol = t.trend === "rising" ? "#dc2626" : t.trend === "declining" ? "#16a34a" : "#94a3b8";
+                return (
+                  <div key={i}
+                    onClick={() => onTopicClick(t)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12, padding: "14px 12px",
+                      borderBottom: i < market.keyTopics.length - 1 ? `1px solid ${P.borderLight}` : "none",
+                      cursor: "pointer", borderRadius: 6, transition: "background 0.15s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = P.surfaceAlt}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: heatColor, flexShrink: 0, boxShadow: `0 0 6px ${heatColor}40` }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: P.text, lineHeight: 1.4 }}>
+                        {t.topic}
+                        {t.topicEn && <span style={{ color: P.textTertiary, fontWeight: 400, fontSize: 12 }}> — {t.topicEn}</span>}
+                      </div>
+                    </div>
+                    <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 700, color: heatColor, minWidth: 30, textAlign: "right" }}>{t.heat}</div>
+                    <div style={{ fontSize: 15, color: trendCol, minWidth: 18, textAlign: "center" }}>{trendIcon}</div>
+                    <div style={{ fontSize: 11, color: P.textTertiary }}>→</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ALERTS */}
+          {dataView === "alerts" && (
+            <div style={{ background: P.surface, border: `1px solid ${P.border}`, borderRadius: 10, padding: 20 }}>
+              {market.recentAlerts.map((a, i) => {
+                const sev = SEVERITY_STYLES[a.severity];
+                return (
+                  <div key={i} style={{
+                    display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 0",
+                    borderBottom: i < market.recentAlerts.length - 1 ? `1px solid ${P.borderLight}` : "none",
+                  }}>
+                    <div style={{
+                      width: 8, height: 8, borderRadius: "50%", background: sev.dot, flexShrink: 0, marginTop: 5,
+                      animation: a.severity === "critical" ? "pulse 2s infinite" : "none",
+                    }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, color: P.text, lineHeight: 1.5 }}>{a.text}</div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                        <Badge bg={sev.bg} color={sev.text}>{a.severity}</Badge>
+                        <span style={{ fontSize: 10, color: P.textTertiary }}>{a.time}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* MOOD */}
+          {dataView === "mood" && (
+            <div style={{ background: P.surface, border: `1px solid ${P.border}`, borderRadius: 10, padding: 24 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: P.textTertiary, letterSpacing: 2, textTransform: "uppercase", marginBottom: 20 }}>
+                NLP-Derived Parliamentary Indicators
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                <MoodMeter label="Chamber Tension" value={market.parliamentaryMood.tension} />
+                <MoodMeter label="Cross-Party Cooperation" value={market.parliamentaryMood.bipartisanship} />
+                <MoodMeter label="Legislative Urgency" value={market.parliamentaryMood.urgency} />
+              </div>
+              <div style={{ marginTop: 20, padding: 16, background: P.surfaceAlt, borderRadius: 8, border: `1px solid ${P.borderLight}`, fontSize: 13, color: P.textSecondary, lineHeight: 1.7 }}>
+                <strong style={{ color: P.text }}>Methodology: </strong>
+                These indicators are derived from NLP analysis of publicly available parliamentary session transcripts. Tension is measured by adversarial language frequency, cooperation by co-sponsorship and cross-party citation rates, and urgency by procedural acceleration language and emergency scheduling patterns.
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Sidebar */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ background: P.surface, border: `1px solid ${P.border}`, borderRadius: 10, padding: 18 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: P.textTertiary, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>
+              Aggregate Sentiment
+            </div>
+            <SentimentBar {...market.sentimentBreakdown} />
+          </div>
+
+          <div style={{ background: P.surface, border: `1px solid ${P.border}`, borderRadius: 10, padding: 18 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: P.textTertiary, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>
+              All Markets
+            </div>
+            {Object.values(MARKETS).map((m) => {
+              const mw = WEATHER_META[m.weatherCondition];
+              return (
+                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 6px", borderRadius: 6, marginBottom: 2, background: m.id === market.id ? P.surfaceAlt : "transparent" }}>
+                  <span style={{ fontSize: 15 }}>{m.flag}</span>
+                  <div style={{ flex: 1, fontSize: 12, fontWeight: m.id === market.id ? 600 : 400, color: m.id === market.id ? P.text : P.textSecondary }}>{m.name}</div>
+                  <div style={{ width: 44, height: 4, borderRadius: 2, background: P.borderLight, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${m.stabilityIndex}%`, background: mw.barColor, borderRadius: 2 }} />
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: mw.barColor, fontFamily: "'IBM Plex Mono', monospace", minWidth: 22, textAlign: "right" }}>{m.stabilityIndex}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ background: P.surface, border: `1px solid ${P.border}`, borderRadius: 10, padding: 18 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: P.textTertiary, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>
+              Source Infrastructure
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {allSourceIds.map((sid) => {
+                const src = SOURCE_REGISTRY[sid];
+                if (!src) return null;
+                const t = SOURCE_TYPE_LABELS[src.type] || {};
+                return (
+                  <div key={sid} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11 }}>
+                    <span style={{ fontSize: 11 }}>{t.icon}</span>
+                    <span style={{ flex: 1, color: P.textSecondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{src.name}</span>
+                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TopicDetailView({ topic, market, onBack }) {
+  const [expandedInsight, setExpandedInsight] = useState(null);
+  const relatedInsights = market.aiInsights.filter((ins) => topic.insightIds.includes(ins.id));
+  const topicSources = topic.sourcesUsed.map((sid) => SOURCE_REGISTRY[sid]).filter(Boolean);
+
+  return (
+    <div style={{ animation: "fadeIn 0.3s ease" }}>
+      <button
+        onClick={onBack}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px",
+          background: P.surfaceAlt, border: `1px solid ${P.border}`, borderRadius: 6,
+          color: P.textSecondary, fontSize: 12, cursor: "pointer", marginBottom: 20, fontFamily: "inherit",
+        }}
+      >
+        ← Back to {market.name} Dashboard
+      </button>
+
+      <div style={{ display: "grid", gridTemplateColumns: "5fr 2fr", gap: 16 }}>
+        <div>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <div style={{
+                width: 10, height: 10, borderRadius: "50%",
+                background: topic.heat > 80 ? "#dc2626" : topic.heat > 60 ? "#ea580c" : "#ca8a04",
+                boxShadow: `0 0 8px ${topic.heat > 80 ? "#dc262640" : "#ea580c40"}`,
+              }} />
+              <Badge bg={topic.heat > 80 ? "#fef2f2" : "#fff7ed"} color={topic.heat > 80 ? "#991b1b" : "#9a3412"}>
+                Heat {topic.heat}/100
+              </Badge>
+              <Badge>{topic.trend}</Badge>
+            </div>
+            <h2 style={{ margin: "0 0 4px", fontSize: 24, fontWeight: 700, color: P.text, fontFamily: "'Source Serif 4', Georgia, serif", lineHeight: 1.3 }}>
+              {topic.topic}
+            </h2>
+            {topic.topicEn && (
+              <div style={{ fontSize: 14, color: P.textSecondary, marginBottom: 8 }}>{topic.topicEn}</div>
+            )}
+            <p style={{ fontSize: 14, color: P.textSecondary, lineHeight: 1.7, marginTop: 8 }}>{topic.summary}</p>
+          </div>
+
+          {relatedInsights.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: P.textTertiary, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>
+                AI Insights for This Topic
+              </div>
+              {relatedInsights.map((insight) => {
+                const sev = SEVERITY_STYLES[insight.severity];
+                const isExp = expandedInsight === insight.id;
+                return (
+                  <div key={insight.id} style={{
+                    background: P.surface, border: `1px solid ${P.border}`, borderLeft: `4px solid ${sev.dot}`,
+                    borderRadius: 10, padding: 20, marginBottom: 14, cursor: "pointer",
+                    boxShadow: isExp ? "0 4px 24px rgba(0,0,0,0.06)" : "none",
+                  }} onClick={() => setExpandedInsight(isExp ? null : insight.id)}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <Badge bg={sev.bg} color={sev.text}>{insight.severity}</Badge>
+                        <Badge>{insight.category}</Badge>
+                      </div>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: "50%", border: `2px solid ${sev.dot}`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 12, fontWeight: 700, color: sev.dot, fontFamily: "'IBM Plex Mono', monospace",
+                      }}>{insight.confidence}</div>
+                    </div>
+                    <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700, fontFamily: "'Source Serif 4', Georgia, serif", color: P.text }}>{insight.title}</h3>
+                    <p style={{ margin: 0, fontSize: 13, color: P.textSecondary, lineHeight: 1.7 }}>{insight.summary}</p>
+                    {isExp && (
+                      <div style={{ marginTop: 16, borderTop: `1px solid ${P.border}`, paddingTop: 16 }}>
+                        <div style={{ background: `${sev.dot}08`, border: `1px solid ${sev.dot}20`, borderRadius: 8, padding: 14, marginBottom: 16 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: sev.dot, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 4 }}>Prediction</div>
+                          <div style={{ fontSize: 14, color: P.text, lineHeight: 1.6 }}>{insight.prediction}</div>
+                        </div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: P.text, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12 }}>
+                          Verified Sources ({insight.dataSources.length})
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                          {insight.dataSources.map((ds, i) => (
+                            <SourceDetailCard key={i} sourceId={ds.sourceId} detail={ds.detail} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ fontSize: 10, color: P.textTertiary, marginTop: 10, textAlign: "right" }}>
+                      {isExp ? "Click to collapse" : `Click to see ${insight.dataSources.length} verified sources →`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {relatedInsights.length === 0 && (
+            <div style={{
+              background: P.surface, border: `1px dashed ${P.border}`, borderRadius: 10,
+              padding: 32, textAlign: "center", marginBottom: 20,
+            }}>
+              <div style={{ fontSize: 14, color: P.textTertiary }}>No AI insight cards generated for this topic yet.</div>
+              <div style={{ fontSize: 12, color: P.textTertiary, marginTop: 4 }}>The system generates insights when cross-source pattern confidence exceeds threshold.</div>
+            </div>
+          )}
+
+          {/* Topic intelligence sources */}
+          <div style={{ fontSize: 10, fontWeight: 700, color: P.textTertiary, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>
+            Intelligence Sources for This Topic ({topicSources.length})
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {topicSources.map((src, i) => {
+              const t = SOURCE_TYPE_LABELS[src.type] || {};
+              return (
+                <div key={i} style={{
+                  background: P.surface, border: `1px solid ${P.border}`, borderRadius: 8, padding: 14,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                    <span>{t.icon}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: P.text }}>{src.name}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: P.textSecondary, lineHeight: 1.6, marginBottom: 6 }}>{src.method}</div>
+                  <div style={{ display: "flex", gap: 10, fontSize: 10, color: P.textTertiary }}>
+                    <span>{src.format}</span>
+                    <span>{src.frequency}</span>
+                  </div>
+                  <a href={src.url} target="_blank" rel="noopener" style={{ fontSize: 10, color: t.color || "#2563eb", textDecoration: "none", marginTop: 4, display: "block" }}>{src.url}</a>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Topic sidebar */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ background: P.surface, border: `1px solid ${P.border}`, borderRadius: 10, padding: 18 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: P.textTertiary, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>
+              Topic Sentiment
+            </div>
+            <SentimentBar {...topic.sentiment} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SearchView({ market, onTopicClick, onBack }) {
+  const [query, setQuery] = useState("");
+  const allTopics = market.keyTopics;
+  const filtered = query.trim()
+    ? allTopics.filter((t) => {
+        const q = query.toLowerCase();
+        return t.topic.toLowerCase().includes(q) || (t.topicEn || "").toLowerCase().includes(q) || (t.summary || "").toLowerCase().includes(q);
+      })
+    : allTopics;
+
+  return (
+    <div style={{ animation: "fadeIn 0.3s ease" }}>
+      <button onClick={onBack} style={{
+        display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px",
+        background: P.surfaceAlt, border: `1px solid ${P.border}`, borderRadius: 6,
+        color: P.textSecondary, fontSize: 12, cursor: "pointer", marginBottom: 20, fontFamily: "inherit",
+      }}>
+        ← Back to Dashboard
+      </button>
+
+      <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 700, color: P.text, fontFamily: "'Source Serif 4', Georgia, serif" }}>
+        Search Topics — {market.name}
+      </h2>
+      <p style={{ fontSize: 13, color: P.textSecondary, marginBottom: 20 }}>
+        Search across all monitored political topics in {market.name}. Click any result to see full intelligence.
+      </p>
+
+      <div style={{ position: "relative", marginBottom: 24 }}>
+        <input
+          type="text"
+          placeholder={`Search topics in ${market.name}...`}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          style={{
+            width: "100%", padding: "14px 18px 14px 44px", borderRadius: 10,
+            border: `1px solid ${P.border}`, background: P.surface,
+            fontSize: 15, color: P.text, outline: "none", fontFamily: "inherit",
+            boxSizing: "border-box",
+            transition: "border-color 0.2s",
+          }}
+          onFocus={(e) => (e.target.style.borderColor = market.accentColor)}
+          onBlur={(e) => (e.target.style.borderColor = P.border)}
+        />
+        <span style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", fontSize: 17, color: P.textTertiary }}>⌕</span>
+      </div>
+
+      <div style={{ fontSize: 10, color: P.textTertiary, marginBottom: 12, letterSpacing: 1, textTransform: "uppercase" }}>
+        {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+      </div>
+
+      {filtered.map((t, i) => {
+        const heatColor = t.heat > 80 ? "#dc2626" : t.heat > 60 ? "#ea580c" : "#ca8a04";
+        return (
+          <div
+            key={i}
+            onClick={() => onTopicClick(t)}
+            style={{
+              background: P.surface, border: `1px solid ${P.border}`, borderRadius: 10,
+              padding: 18, marginBottom: 10, cursor: "pointer", transition: "box-shadow 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.04)")}
+            onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: heatColor }} />
+              <div style={{ flex: 1, fontSize: 15, fontWeight: 600, color: P.text }}>
+                {t.topic}
+                {t.topicEn && <span style={{ fontWeight: 400, color: P.textSecondary, fontSize: 13 }}> — {t.topicEn}</span>}
+              </div>
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 700, color: heatColor }}>{t.heat}</span>
+            </div>
+            <p style={{ margin: 0, fontSize: 12, color: P.textSecondary, lineHeight: 1.6 }}>{t.summary}</p>
+            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+              <SentimentBar {...t.sentiment} compact />
+            </div>
+          </div>
+        );
+      })}
+
+      {filtered.length === 0 && (
+        <div style={{ background: P.surface, border: `1px dashed ${P.border}`, borderRadius: 10, padding: 40, textAlign: "center" }}>
+          <div style={{ fontSize: 14, color: P.textTertiary }}>No topics matching "{query}" in {market.name}.</div>
+          <div style={{ fontSize: 12, color: P.textTertiary, marginTop: 4 }}>In production, this would trigger a real-time intelligence query across all sources.</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// APP ROOT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function App() {
+  const [activeMarket, setActiveMarket] = useState("edinburgh");
+  const [view, setView] = useState("dashboard"); // dashboard | topic | search
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [expandedInsight, setExpandedInsight] = useState(null);
+  const [dataView, setDataView] = useState("insights");
+  const [liveTime, setLiveTime] = useState(new Date());
+
+  useEffect(() => {
+    const t = setInterval(() => setLiveTime(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const market = MARKETS[activeMarket];
+
+  const handleMarketChange = (id) => {
+    setActiveMarket(id);
+    setView("dashboard");
+    setExpandedInsight(null);
+    setDataView("insights");
+    setSelectedTopic(null);
+  };
+
+  const handleTopicClick = (topic) => {
+    setSelectedTopic(topic);
+    setView("topic");
+    setExpandedInsight(null);
+  };
+
+  const handleBackToDashboard = () => {
+    setView("dashboard");
+    setSelectedTopic(null);
+    setExpandedInsight(null);
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: P.bg, color: P.text, fontFamily: "'Source Sans 3', 'Segoe UI', system-ui, sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+        * { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: ${P.border}; border-radius: 3px; }
+        input::placeholder { color: ${P.textTertiary}; }
+      `}</style>
+
+      {/* Header */}
+      <header style={{
+        background: P.surface, borderBottom: `1px solid ${P.border}`,
+        padding: "0 32px",
+        position: "sticky", top: 0, zIndex: 100,
+      }}>
+        <div style={{ maxWidth: 1360, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", height: 64 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+            <h1 style={{
+              margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: -0.5,
+              color: P.text, fontFamily: "'IBM Plex Mono', monospace",
+            }}>
+              TRMNL 2
+            </h1>
+            <span style={{ fontSize: 13, color: P.textTertiary, fontFamily: "'Source Serif 4', Georgia, serif", fontStyle: "italic" }}>
+              Local Weather Reports
+            </span>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            <button
+              onClick={() => setView(view === "search" ? "dashboard" : "search")}
+              style={{
+                display: "flex", alignItems: "center", gap: 6, padding: "6px 14px",
+                background: view === "search" ? P.surfaceAlt : "transparent",
+                border: `1px solid ${view === "search" ? P.border : "transparent"}`,
+                borderRadius: 6, cursor: "pointer", fontSize: 13, color: P.textSecondary, fontFamily: "inherit",
+              }}
+            >
+              ⌕ Search Topics
+            </button>
+            <span style={{ fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", color: P.textTertiary }}>
+              {liveTime.toLocaleTimeString("en-GB")}
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", animation: "pulse 2s infinite" }} />
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#16a34a", letterSpacing: 1 }}>LIVE</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Market selector bar */}
+      <div style={{ background: P.surface, borderBottom: `1px solid ${P.border}`, padding: "0 32px" }}>
+        <div style={{ maxWidth: 1360, margin: "0 auto", display: "flex", gap: 4, padding: "10px 0", overflowX: "auto" }}>
+          {Object.values(MARKETS).map((m) => {
+            const mw = WEATHER_META[m.weatherCondition];
+            const isActive = m.id === activeMarket;
+            return (
+              <button
+                key={m.id}
+                onClick={() => handleMarketChange(m.id)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, padding: "8px 16px",
+                  borderRadius: 8,
+                  background: isActive ? mw.badgeBg : "transparent",
+                  border: `1px solid ${isActive ? mw.badgeText + "30" : "transparent"}`,
+                  cursor: "pointer", fontFamily: "inherit", outline: "none", transition: "all 0.2s",
+                }}
+              >
+                <span style={{ fontSize: 18 }}>{m.flag}</span>
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 13, fontWeight: isActive ? 700 : 500, color: isActive ? P.text : P.textSecondary }}>{m.name}</div>
+                  <div style={{ fontSize: 10, color: P.textTertiary }}>{m.country}</div>
+                </div>
+                <span style={{ fontSize: 16, marginLeft: 2 }}>{mw.icon}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Content */}
+      <main style={{ maxWidth: 1360, margin: "0 auto", padding: "24px 32px 60px" }}>
+        {view === "dashboard" && (
+          <DashboardView
+            market={market}
+            onTopicClick={handleTopicClick}
+            onInsightExpand={setExpandedInsight}
+            expandedInsight={expandedInsight}
+            dataView={dataView}
+            setDataView={setDataView}
+          />
+        )}
+        {view === "topic" && selectedTopic && (
+          <TopicDetailView topic={selectedTopic} market={market} onBack={handleBackToDashboard} />
+        )}
+        {view === "search" && (
+          <SearchView market={market} onTopicClick={handleTopicClick} onBack={handleBackToDashboard} />
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer style={{ borderTop: `1px solid ${P.border}`, padding: "16px 32px", background: P.surface }}>
+        <div style={{ maxWidth: 1360, margin: "0 auto", display: "flex", justifyContent: "space-between", fontSize: 11, color: P.textTertiary }}>
+          <span>TRMNL 2 — All listed data sources are publicly accessible and automatable via web scraping, RSS, or official APIs.</span>
+          <span>MVP Prototype • 4 Markets • {Object.keys(SOURCE_REGISTRY).length} Verified Sources</span>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+  </script>
+</body>
+</html>

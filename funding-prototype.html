@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Class Action Campaign Platform — Conditional Funding Prototype</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Georgia, serif; background: #0B0E0F; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+const CAMPAIGN = {
+  title: "Fair Stadium Pricing Act",
+  subtitle: "Philadelphia · Lincoln Financial Field",
+  category: "Consumer Protection",
+  jurisdiction: "City of Philadelphia",
+  target: 250000,
+  current: 187420,
+  contributors: 38215,
+  daysLeft: 14,
+  avgContribution: 4.91,
+  brief: {
+    problem: "Fans at Lincoln Financial Field pay up to $18.50 for a single beer — nearly 5x the retail price — in a stadium built with public subsidies. The concession contract between the City of Philadelphia and Aramark Corporation is a public document, but no one has challenged the absence of consumer pricing protections that already exist at comparable public facilities. Lincoln Financial Field now has among the most expensive concessions in the entire NFL, and fans are paying for it every single game day.",
+    precedent: "Street pricing is already the law at airports across the country. Portland International Airport has enforced strict street pricing since the 1980s, with retail sales consistently above the national average. New York and Los Angeles airports require concession prices within 110% of off-site retail. When Mercedes-Benz Stadium opened in Atlanta in 2017, the Falcons voluntarily cut concession prices by 50% — $2 hot dogs, $5 beers — and total revenue actually increased because fans bought more. Philadelphia International Airport already operates under similar pricing rules. The mechanism is proven. It has simply never been applied to publicly-subsidised sports venues.",
+    legislation: "This issue is gaining serious momentum. In December 2025, Representatives Goldman and Deluzio introduced the HOTDOG Act in Congress — federal legislation directing the FTC to investigate pricing practices at publicly-subsidised stadiums. The Groundwork Collaborative published a major policy brief calling for street pricing at all taxpayer-funded venues. And polling shows 73% of American voters — including 78% of Independents and 76% of Republicans — support policies restricting concession price gouging at publicly-funded venues. Philadelphia City Council has already demonstrated willingness to attach conditions to stadium subsidies, having passed a prevailing wage ordinance covering all city-subsidised buildings including the Linc.",
+    objective: "Fund a professional lobbying and strategic communications campaign to draft and advance a Fair Concession Pricing Ordinance in Philadelphia City Council, requiring that food and beverage prices at publicly-subsidised venues not exceed 150% of average local retail prices.",
+    outcome: "If successful, the price of a domestic beer at Lincoln Financial Field drops from $18.50 to approximately $9. Every fan saves $20-50 per game. Over a season, that's $200-500 returned to each family that attends regularly — a direct, measurable return on a $5 conditional contribution."
+  },
+  budget: [
+    { item: "Legal drafting & regulatory analysis", amount: 45000, pct: 18 },
+    { item: "Lobbying & government affairs", amount: 65000, pct: 26 },
+    { item: "Strategic communications & earned media", amount: 55000, pct: 22 },
+    { item: "Creative production & paid media", amount: 40000, pct: 16 },
+    { item: "Coalition building & organising", amount: 25000, pct: 10 },
+    { item: "Platform fee & operations", amount: 20000, pct: 8 },
+  ],
+  escrow: {
+    provider: "Stripe Connect Escrow",
+    threshold: 250000,
+    deadline: "March 15, 2026",
+    guarantee: "Your contribution is held in escrow by Stripe. If the campaign does not reach its $250,000 threshold by March 15, 2026, 100% of your contribution is automatically returned to your original payment method. No exceptions."
+  }
+};
+
+const formatCurrency = (n) => "$" + n.toLocaleString();
+const formatNumber = (n) => n.toLocaleString();
+const easeOutExpo = (t) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t));
+
+function useAnimatedValue(target, duration = 1800, delay = 0) {
+  const [value, setValue] = useState(0);
+  const startTime = useRef(null);
+  const animFrame = useRef(null);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      startTime.current = performance.now();
+      const animate = (now) => {
+        const elapsed = now - startTime.current;
+        const progress = Math.min(elapsed / duration, 1);
+        setValue(Math.floor(easeOutExpo(progress) * target));
+        if (progress < 1) animFrame.current = requestAnimationFrame(animate);
+      };
+      animFrame.current = requestAnimationFrame(animate);
+    }, delay);
+    return () => { clearTimeout(timeout); cancelAnimationFrame(animFrame.current); };
+  }, [target, duration, delay]);
+  return value;
+}
+
+function ShieldIcon({ size = 20, color = "#6ab394" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <polyline points="9 12 11 14 15 10" />
+    </svg>
+  );
+}
+
+function CheckCircleIcon({ size = 18, color = "#6ab394" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+      <polyline points="22 4 12 14.01 9 11.01" />
+    </svg>
+  );
+}
+
+function ArrowDown({ size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
+function BackArrow({ size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="19" y1="12" x2="5" y2="12" />
+      <polyline points="12 19 5 12 12 5" />
+    </svg>
+  );
+}
+
+function BudgetRow({ item, amount, pct, index, eaglesTheme }) {
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const timer = setTimeout(() => setWidth(pct), 200 + index * 120);
+    return () => clearTimeout(timer);
+  }, [pct, index]);
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 13, fontFamily: "'Source Serif 4', Georgia, serif" }}>
+        <span style={{ color: eaglesTheme ? EAGLES.silverLight : "#ccc" }}>{item}</span>
+        <span style={{ color: eaglesTheme ? EAGLES.accent : "#d4a574", fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{formatCurrency(amount)} · {pct}%</span>
+      </div>
+      <div style={{ width: "100%", height: 4, background: eaglesTheme ? EAGLES.greenDark : "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
+        <div style={{ width: `${width}%`, height: "100%", background: eaglesTheme ? EAGLES.accent : "#d4a574", borderRadius: 2, transition: `width 1s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.12}s` }} />
+      </div>
+    </div>
+  );
+}
+
+// Eagles palette
+const EAGLES = {
+  green: "#004C54",
+  greenLight: "#00635D",
+  greenDark: "#003338",
+  silver: "#A5ACAF",
+  silverLight: "#C8CDD0",
+  silverDark: "#8B9194",
+  white: "#F0F2F3",
+  black: "#0B0E0F",
+  accent: "#5CDB95",
+  accentMuted: "#3BA575",
+};
+
+// ============================================================
+// LAYER 1: THE EMOTIONAL HOOK — EAGLES COLORS
+// ============================================================
+function HookLayer({ onDetails }) {
+  const contributors = useAnimatedValue(38215, 2000, 600);
+  const [selectedAmount, setSelectedAmount] = useState(5);
+  const [confirmed, setConfirmed] = useState(false);
+  const [pricePulse, setPricePulse] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setPricePulse(true), 400);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (confirmed) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: EAGLES.black,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        textAlign: "center",
+        animation: "fadeIn 0.5s ease"
+      }}>
+        <div style={{
+          width: 72, height: 72, borderRadius: "50%",
+          background: "rgba(92,219,149,0.1)",
+          border: `2px solid rgba(92,219,149,0.3)`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          marginBottom: 28,
+          animation: "scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)"
+        }}>
+          <CheckCircleIcon size={36} color={EAGLES.accent} />
+        </div>
+        <h2 style={{
+          fontFamily: "'Playfair Display', Georgia, serif",
+          fontSize: 32, color: EAGLES.white, margin: "0 0 10px"
+        }}>
+          You're in.
+        </h2>
+        <p style={{
+          fontSize: 17, color: EAGLES.silver,
+          fontFamily: "'Source Serif 4', Georgia, serif",
+          margin: "0 0 8px", lineHeight: 1.6
+        }}>
+          Your ${selectedAmount} is held in escrow — protected until<br />
+          {formatNumber(contributors + 1)} fans hit the funding threshold.
+        </p>
+        <p style={{
+          fontSize: 14, color: EAGLES.silverDark,
+          fontFamily: "'Source Serif 4', Georgia, serif",
+          margin: "0 0 36px", lineHeight: 1.6
+        }}>
+          If this campaign succeeds, you'll save $200–500 this season.<br />
+          Not a bad return on ${selectedAmount}.
+        </p>
+
+        <button
+          onClick={onDetails}
+          style={{
+            padding: "14px 28px", background: "none",
+            border: `1px solid ${EAGLES.greenLight}`, borderRadius: 8,
+            color: EAGLES.silver,
+            fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
+            cursor: "pointer", letterSpacing: 0.5
+          }}
+        >
+          See full campaign details
+        </button>
+
+        <div style={{
+          marginTop: 40, padding: "14px 20px",
+          background: "rgba(92,219,149,0.05)",
+          border: "1px solid rgba(92,219,149,0.12)",
+          borderRadius: 8,
+          display: "flex", alignItems: "center", gap: 10, maxWidth: 380
+        }}>
+          <ShieldIcon size={16} color={EAGLES.accent} />
+          <span style={{ fontSize: 12, color: EAGLES.accentMuted, fontFamily: "'JetBrains Mono', monospace" }}>
+            Escrow protected · Fully refundable if threshold not met
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: `linear-gradient(170deg, ${EAGLES.greenDark} 0%, ${EAGLES.black} 55%)`,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 24,
+      position: "relative",
+      overflow: "hidden"
+    }}>
+      {/* Atmospheric elements */}
+      <div style={{
+        position: "absolute", top: "-20%", right: "-10%",
+        width: 600, height: 600,
+        background: `radial-gradient(circle, rgba(0,76,84,0.25) 0%, transparent 70%)`,
+        pointerEvents: "none"
+      }} />
+      <div style={{
+        position: "absolute", bottom: "-10%", left: "-15%",
+        width: 500, height: 500,
+        background: `radial-gradient(circle, rgba(0,99,93,0.15) 0%, transparent 70%)`,
+        pointerEvents: "none"
+      }} />
+
+      <div style={{
+        maxWidth: 440, width: "100%", textAlign: "center",
+        position: "relative", zIndex: 2
+      }}>
+        {/* The price — the emotional trigger */}
+        <div style={{
+          fontSize: pricePulse ? 84 : 64,
+          fontFamily: "'Playfair Display', Georgia, serif",
+          fontWeight: 700,
+          color: EAGLES.silverLight,
+          lineHeight: 1,
+          marginBottom: 6,
+          transition: "font-size 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+          textShadow: "0 2px 20px rgba(165,172,175,0.15)"
+        }}>
+          $18.50
+        </div>
+        <div style={{
+          fontSize: 16, color: EAGLES.silverDark,
+          fontFamily: "'JetBrains Mono', monospace",
+          letterSpacing: 1.5, marginBottom: 36,
+          animation: "fadeIn 0.5s ease 0.2s both"
+        }}>
+          for a beer.
+        </div>
+
+        {/* The pitch */}
+        <div style={{ animation: "fadeIn 0.6s ease 0.4s both" }}>
+          <p style={{
+            fontSize: 20, lineHeight: 1.6, color: EAGLES.white,
+            fontFamily: "'Source Serif 4', Georgia, serif",
+            margin: "0 0 20px", textAlign: "left"
+          }}>
+            It's already illegal to charge these prices at Philadelphia's own airport. We're building a fan-funded campaign to bring the same rule to the Linc.
+          </p>
+
+          <p style={{
+            fontSize: 17, lineHeight: 1.6, color: EAGLES.silver,
+            fontFamily: "'Source Serif 4', Georgia, serif",
+            margin: "0 0 12px", textAlign: "left"
+          }}>
+            {formatNumber(contributors)} fans have chipped in. If we hit our threshold, professional lobbyists go to work for <em style={{ color: EAGLES.accent }}>us</em>. If we don't, every dollar is returned.
+          </p>
+
+          <p style={{
+            fontSize: 14, lineHeight: 1.6, color: EAGLES.silverDark,
+            fontFamily: "'Source Serif 4', Georgia, serif",
+            margin: "0 0 36px", textAlign: "left"
+          }}>
+            73% of American voters already support this. Congress introduced legislation in December. All that's missing is a funded campaign in Philadelphia.
+          </p>
+        </div>
+
+        {/* CTA area */}
+        <div style={{ animation: "fadeIn 0.6s ease 0.6s both" }}>
+          {/* I'M IN header */}
+          <div style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 13,
+            letterSpacing: 3,
+            color: EAGLES.silverLight,
+            textTransform: "uppercase",
+            marginBottom: 14,
+            fontWeight: 700
+          }}>
+            I'm in
+          </div>
+
+          {/* Amount buttons */}
+          <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+            {[5, 10, 25].map(amt => (
+              <button
+                key={amt}
+                onClick={() => setSelectedAmount(amt)}
+                style={{
+                  flex: 1,
+                  padding: "18px 12px",
+                  background: selectedAmount === amt
+                    ? `linear-gradient(135deg, ${EAGLES.green}, ${EAGLES.greenLight})`
+                    : "rgba(165,172,175,0.06)",
+                  border: selectedAmount === amt
+                    ? `2px solid ${EAGLES.accent}`
+                    : "2px solid rgba(165,172,175,0.15)",
+                  borderRadius: 10,
+                  color: selectedAmount === amt ? EAGLES.white : EAGLES.silver,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 24,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all 0.2s ease"
+                }}
+              >
+                ${amt}
+              </button>
+            ))}
+          </div>
+
+          {/* Commit button */}
+          <button
+            onClick={() => setConfirmed(true)}
+            style={{
+              width: "100%",
+              padding: "20px 24px",
+              background: `linear-gradient(135deg, ${EAGLES.green}, ${EAGLES.greenLight})`,
+              border: `1px solid ${EAGLES.accentMuted}`,
+              borderRadius: 10,
+              color: EAGLES.white,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 15,
+              fontWeight: 700,
+              letterSpacing: 1,
+              textTransform: "uppercase",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              marginBottom: 12
+            }}
+            onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
+            onMouseLeave={e => e.target.style.transform = "translateY(0)"}
+          >
+            Commit ${selectedAmount} — fully refundable
+          </button>
+
+          {/* Learn More button */}
+          <button
+            onClick={onDetails}
+            style={{
+              width: "100%",
+              padding: "16px 24px",
+              background: "none",
+              border: `1px solid rgba(165,172,175,0.2)`,
+              borderRadius: 10,
+              color: EAGLES.silver,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 13,
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              letterSpacing: 0.5,
+              marginBottom: 20
+            }}
+            onMouseEnter={e => { e.target.style.borderColor = "rgba(165,172,175,0.4)"; e.target.style.color = EAGLES.silverLight; }}
+            onMouseLeave={e => { e.target.style.borderColor = "rgba(165,172,175,0.2)"; e.target.style.color = EAGLES.silver; }}
+          >
+            Learn More
+          </button>
+
+          {/* Escrow badge */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8
+          }}>
+            <ShieldIcon size={14} color={EAGLES.accentMuted} />
+            <span style={{
+              fontSize: 11, color: EAGLES.accentMuted,
+              fontFamily: "'JetBrains Mono', monospace"
+            }}>
+              Escrow protected · Money back if threshold not met
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer badge */}
+      <div style={{
+        position: "absolute", bottom: 20,
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 9, color: "rgba(165,172,175,0.25)",
+        letterSpacing: 2, textTransform: "uppercase"
+      }}>
+        Class Action Campaign Platform
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// LAYER 2: THE DETAIL LAYER (dark/amber — investor-grade)
+// ============================================================
+const DETAIL_SECTIONS = ["brief", "budget", "escrow"];
+const DETAIL_LABELS = ["Campaign Brief", "Budget", "Escrow Terms"];
+
+function DetailLayer({ onBack }) {
+  const [activeSection, setActiveSection] = useState("brief");
+  const pct = Math.min((CAMPAIGN.current / CAMPAIGN.target) * 100, 100);
+  const [barWidth, setBarWidth] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => setBarWidth(pct), 100);
+    return () => clearTimeout(t);
+  }, [pct]);
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: EAGLES.black,
+      color: EAGLES.white,
+      fontFamily: "'Source Serif 4', Georgia, serif"
+    }}>
+      {/* Top bar */}
+      <div style={{
+        borderBottom: `1px solid ${EAGLES.greenDark}`,
+        padding: "12px 24px",
+        display: "flex", alignItems: "center", justifyContent: "space-between"
+      }}>
+        <button onClick={onBack} style={{
+          background: "none", border: "none", color: EAGLES.silver, cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 6,
+          fontFamily: "'JetBrains Mono', monospace", fontSize: 12, padding: 0
+        }}>
+          <BackArrow size={16} /> Back
+        </button>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8,
+          fontSize: 12, color: EAGLES.accentMuted, fontFamily: "'JetBrains Mono', monospace"
+        }}>
+          <ShieldIcon size={14} color={EAGLES.accentMuted} />
+          Escrow Protected
+        </div>
+      </div>
+
+      {/* Campaign header */}
+      <div style={{ padding: "28px 24px 24px", maxWidth: 720, margin: "0 auto" }}>
+        <div style={{
+          fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
+          letterSpacing: 2, color: EAGLES.accent, textTransform: "uppercase", marginBottom: 8
+        }}>
+          {CAMPAIGN.category} · {CAMPAIGN.jurisdiction}
+        </div>
+        <h1 style={{
+          fontSize: 28, fontWeight: 700, margin: "0 0 4px", lineHeight: 1.2,
+          color: EAGLES.white, fontFamily: "'Playfair Display', Georgia, serif"
+        }}>
+          {CAMPAIGN.title}
+        </h1>
+        <p style={{
+          fontSize: 14, color: EAGLES.silverDark, margin: "0 0 20px",
+          fontFamily: "'Source Serif 4', Georgia, serif"
+        }}>
+          {CAMPAIGN.subtitle}
+        </p>
+
+        {/* Stats */}
+        <div style={{ display: "flex", gap: 24, marginBottom: 8, flexWrap: "wrap" }}>
+          <div>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, color: EAGLES.accent, fontWeight: 700 }}>
+              {formatCurrency(CAMPAIGN.current)}
+            </span>
+            <span style={{ fontSize: 12, color: EAGLES.silverDark, fontFamily: "'JetBrains Mono', monospace", marginLeft: 8 }}>
+              of {formatCurrency(CAMPAIGN.target)}
+            </span>
+          </div>
+          <div>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, color: EAGLES.silverLight, fontWeight: 700 }}>
+              {formatNumber(CAMPAIGN.contributors)}
+            </span>
+            <span style={{ fontSize: 12, color: EAGLES.silverDark, fontFamily: "'JetBrains Mono', monospace", marginLeft: 8 }}>
+              Fractional Clients
+            </span>
+          </div>
+          <div>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, color: EAGLES.silverLight, fontWeight: 700 }}>
+              {CAMPAIGN.daysLeft}
+            </span>
+            <span style={{ fontSize: 12, color: EAGLES.silverDark, fontFamily: "'JetBrains Mono', monospace", marginLeft: 8 }}>
+              days left
+            </span>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ width: "100%", marginTop: 8, marginBottom: 4 }}>
+          <div style={{ width: "100%", height: 6, background: EAGLES.greenDark, borderRadius: 3, overflow: "hidden" }}>
+            <div style={{
+              width: `${barWidth}%`, height: "100%",
+              background: `linear-gradient(90deg, ${EAGLES.accentMuted}, ${EAGLES.accent})`,
+              borderRadius: 3,
+              transition: "width 2s cubic-bezier(0.16, 1, 0.3, 1)"
+            }} />
+          </div>
+          <div style={{
+            display: "flex", justifyContent: "space-between", marginTop: 4,
+            fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: EAGLES.silverDark
+          }}>
+            <span>{pct.toFixed(1)}% funded</span>
+            <span>threshold: {formatCurrency(CAMPAIGN.target)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{
+        borderTop: `1px solid ${EAGLES.greenDark}`, borderBottom: `1px solid ${EAGLES.greenDark}`,
+        display: "flex", maxWidth: 720, margin: "0 auto"
+      }}>
+        {DETAIL_SECTIONS.map((s, i) => (
+          <button key={s} onClick={() => setActiveSection(s)} style={{
+            flex: 1, padding: "13px 8px", background: "none", border: "none",
+            borderBottom: activeSection === s ? `2px solid ${EAGLES.accent}` : "2px solid transparent",
+            color: activeSection === s ? EAGLES.accent : EAGLES.silverDark,
+            fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
+            letterSpacing: 0.5, cursor: "pointer", transition: "all 0.3s ease",
+            textTransform: "uppercase"
+          }}>
+            {DETAIL_LABELS[i]}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div style={{ maxWidth: 720, margin: "0 auto", padding: "28px 24px 60px" }}>
+        {activeSection === "brief" && (
+          <div style={{ animation: "fadeIn 0.4s ease" }}>
+            <SectionBlock title="The Problem" eaglesTheme>
+              <p style={pStyleEagles}>{CAMPAIGN.brief.problem}</p>
+            </SectionBlock>
+            <SectionBlock title="Proven Precedent" eaglesTheme>
+              <p style={pStyleEagles}>{CAMPAIGN.brief.precedent}</p>
+            </SectionBlock>
+            <SectionBlock title="Legislative Momentum" eaglesTheme>
+              <p style={pStyleEagles}>{CAMPAIGN.brief.legislation}</p>
+            </SectionBlock>
+            <SectionBlock title="Campaign Objective" eaglesTheme>
+              <p style={pStyleEagles}>{CAMPAIGN.brief.objective}</p>
+            </SectionBlock>
+            <SectionBlock title="Your Return" eaglesTheme>
+              <div style={{
+                background: `rgba(0,76,84,0.25)`,
+                border: `1px solid ${EAGLES.greenLight}`,
+                borderRadius: 8, padding: 20
+              }}>
+                <p style={{ ...pStyleEagles, margin: 0, color: EAGLES.white }}>{CAMPAIGN.brief.outcome}</p>
+              </div>
+            </SectionBlock>
+          </div>
+        )}
+
+        {activeSection === "budget" && (
+          <div style={{ animation: "fadeIn 0.4s ease" }}>
+            <p style={{ ...pStyle, marginBottom: 28, color: EAGLES.silver, borderBottom: `1px solid ${EAGLES.greenDark}`, paddingBottom: 20 }}>
+              Every Class Action Campaign publishes a complete, transparent budget before a single dollar is collected. You can see exactly where your contribution goes.
+            </p>
+            {CAMPAIGN.budget.map((b, i) => (
+              <BudgetRow key={b.item} {...b} index={i} eaglesTheme />
+            ))}
+            <div style={{
+              marginTop: 24, paddingTop: 16, borderTop: `1px solid ${EAGLES.greenDark}`,
+              display: "flex", justifyContent: "space-between",
+              fontFamily: "'JetBrains Mono', monospace", fontSize: 14
+            }}>
+              <span style={{ color: EAGLES.silverLight }}>Total campaign budget</span>
+              <span style={{ color: EAGLES.accent, fontWeight: 700 }}>{formatCurrency(CAMPAIGN.target)}</span>
+            </div>
+            <div style={{
+              marginTop: 24, padding: "14px 18px",
+              background: `rgba(0,76,84,0.2)`,
+              border: `1px solid ${EAGLES.greenDark}`,
+              borderRadius: 8, fontSize: 12, color: EAGLES.silver,
+              fontFamily: "'JetBrains Mono', monospace", lineHeight: 1.7
+            }}>
+              Average contribution: {formatCurrency(CAMPAIGN.avgContribution)} · 
+              Median contribution: $5.00 · 
+              Largest single contribution: $100.00 · 
+              Platform fee: 8% of funds raised
+            </div>
+          </div>
+        )}
+
+        {activeSection === "escrow" && (
+          <div style={{ animation: "fadeIn 0.4s ease" }}>
+            <SectionBlock title="How Conditional Funding Works" eaglesTheme>
+              <p style={pStyleEagles}>
+                This is not a donation. It is a conditional commitment. Your money is held in escrow — it is never spent unless enough people commit to make the campaign viable.
+              </p>
+            </SectionBlock>
+            {[
+              { step: "01", title: "You commit — conditionally", desc: "Choose your contribution amount. Your payment method is charged, but the funds are held in escrow by Stripe — not by the campaign, not by the platform." },
+              { step: "02", title: "The threshold must be met", desc: `This campaign requires ${formatCurrency(CAMPAIGN.target)} in conditional commitments from at least 10,000 Fractional Clients by ${CAMPAIGN.escrow.deadline}. Until that threshold is met, no money is released and no campaign work begins.` },
+              { step: "03", title: "If the threshold is met → campaign executes", desc: "Funds are released from escrow to the vetted campaign providers. Work begins immediately. You receive progress updates throughout execution. Results are published publicly." },
+              { step: "04", title: "If the threshold is not met → full refund", desc: "100% of your contribution is automatically returned to your original payment method. No partial campaigns. No wasted money. The mechanism only works at scale, by design." }
+            ].map((s, i) => (
+              <div key={s.step} style={{
+                display: "flex", gap: 16, marginBottom: 24, paddingBottom: 24,
+                borderBottom: i < 3 ? `1px solid ${EAGLES.greenDark}` : "none"
+              }}>
+                <div style={{
+                  fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
+                  color: EAGLES.accent, minWidth: 28, paddingTop: 2
+                }}>
+                  {s.step}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6, color: EAGLES.white }}>{s.title}</div>
+                  <p style={{ ...pStyleEagles, margin: 0 }}>{s.desc}</p>
+                </div>
+              </div>
+            ))}
+            <div style={{
+              marginTop: 8, padding: "16px 20px",
+              background: "rgba(92,219,149,0.06)",
+              border: "1px solid rgba(92,219,149,0.15)",
+              borderRadius: 8, display: "flex", alignItems: "flex-start", gap: 12
+            }}>
+              <div style={{ marginTop: 2 }}><ShieldIcon size={18} color={EAGLES.accentMuted} /></div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: EAGLES.accentMuted, marginBottom: 4 }}>The Escrow Guarantee</div>
+                <p style={{ margin: 0, fontSize: 13, color: EAGLES.silver, lineHeight: 1.6, fontFamily: "'Source Serif 4', Georgia, serif" }}>
+                  {CAMPAIGN.escrow.guarantee}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{
+        borderTop: `1px solid ${EAGLES.greenDark}`, padding: "16px 24px", textAlign: "center",
+        fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: EAGLES.greenLight,
+        letterSpacing: 2, textTransform: "uppercase"
+      }}>
+        Class Action Campaign Platform · Conditional Funding Prototype · 2026
+      </div>
+    </div>
+  );
+}
+
+function SectionBlock({ title, children, eaglesTheme }) {
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <h3 style={{
+        fontFamily: "'Playfair Display', Georgia, serif", fontSize: 18, fontWeight: 700,
+        color: eaglesTheme ? EAGLES.white : "#e8e0d8",
+        margin: "0 0 12px", paddingBottom: 8,
+        borderBottom: eaglesTheme ? `1px solid ${EAGLES.greenDark}` : "1px solid #1a1a1a"
+      }}>
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+const pStyle = {
+  fontSize: 15, lineHeight: 1.7, color: "#999", margin: "0 0 16px",
+  fontFamily: "'Source Serif 4', Georgia, serif"
+};
+
+const pStyleEagles = {
+  fontSize: 15, lineHeight: 1.7, color: EAGLES.silver, margin: "0 0 16px",
+  fontFamily: "'Source Serif 4', Georgia, serif"
+};
+
+// ============================================================
+// MAIN
+// ============================================================
+function FundingPrototype() {
+  const [layer, setLayer] = useState("hook");
+  return (
+    <div>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap');
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes scaleIn {
+          from { opacity: 0; transform: scale(0.8); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        * { box-sizing: border-box; }
+        button:hover { opacity: 0.92; }
+      `}</style>
+      {layer === "hook" ? (
+        <HookLayer onDetails={() => setLayer("details")} />
+      ) : (
+        <DetailLayer onBack={() => setLayer("hook")} />
+      )}
+    </div>
+  );
+}
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(FundingPrototype));
+  </script>
+</body>
+</html>
