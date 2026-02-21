@@ -18,8 +18,8 @@
     const { useState, useEffect, useCallback, useMemo } = React;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TRMNL 2 — Local Weather Reports
-// Political intelligence dashboard MVP
+// Class Action Campaign Platform — Political Intelligence
+// Misalignment detection dashboard MVP
 //
 // DATA INTEGRITY RULE: Every source listed in this prototype is a real,
 // publicly accessible source that can be monitored via web scraping, RSS,
@@ -527,9 +527,9 @@ const MARKETS = {
     coords: "55.9533° N, 3.1883° W",
     timezone: "GMT+0",
     lang: "en",
-    weatherCondition: "partly_cloudy",
-    weatherLabel: "Partly Cloudy",
-    stabilityIndex: 62,
+    signalLevel: "moderate",
+    signalLabel: "Moderate Misalignment",
+    misalignmentScore: 62,
     trendDirection: "declining",
     trendDelta: -4.2,
     riskLevel: "medium",
@@ -738,9 +738,9 @@ const MARKETS = {
     coords: "39.9526° N, 75.1652° W",
     timezone: "EST (UTC-5)",
     lang: "en",
-    weatherCondition: "stormy",
-    weatherLabel: "Stormy",
-    stabilityIndex: 38,
+    signalLevel: "high",
+    signalLabel: "High Misalignment",
+    misalignmentScore: 38,
     trendDirection: "declining",
     trendDelta: -11.3,
     riskLevel: "high",
@@ -754,6 +754,26 @@ const MARKETS = {
     sourceCounts: { parliamentary: 2103, media: 8742, social: 94200 },
     sentimentBreakdown: { positive: 18, neutral: 35, negative: 47 },
     keyTopics: [
+      {
+        topic: "Stadium Concession Price Gouging",
+        heat: 94,
+        trend: "rising",
+        slug: "stadium-concession-pricing",
+        insightIds: [2],
+        sourcesUsed: [
+          "phila-council-legislation",
+          "phila-inquirer",
+          "whyy",
+          "billy-penn",
+          "phila-open-data",
+          "x-philly-trends",
+          "reddit-philadelphia",
+          "federal-register",
+        ],
+        sentiment: { positive: 5, neutral: 12, negative: 83 },
+        summary:
+          "Lincoln Financial Field charges up to $18.50 for a domestic beer — the highest in the NFL — in a publicly-subsidised stadium. Federal HOTDOG Act introduced Dec 2025. 73% voter support for street pricing. Philadelphia airport already enforces comparable rules. Massive misalignment between concession operator interests and fan sentiment.",
+      },
       {
         topic: "Property Tax Reassessment",
         heat: 88,
@@ -847,6 +867,48 @@ const MARKETS = {
     ],
     aiInsights: [
       {
+        id: 2,
+        confidence: 92,
+        severity: "critical",
+        category: "Consumer Protection",
+        title: "Stadium Concession Pricing — Actionable Misalignment Detected",
+        summary:
+          "Lincoln Financial Field now charges $18.50 for a domestic beer — the highest price in the NFL — in a stadium built with $185M in public subsidies. Aramark holds the concession contract. Philadelphia International Airport already enforces street pricing under comparable public subsidy terms, establishing clear regulatory precedent within the same jurisdiction. Federal legislation (HOTDOG Act, introduced Dec 2025 by Reps. Goldman & Deluzio) is directing FTC investigation of exactly this issue. Groundwork Collaborative polling shows 73% of voters — 78% of Independents, 76% of Republicans — support concession price caps at publicly-funded venues.",
+        prediction:
+          "High-probability Class Action Campaign opportunity. Regulatory mechanism is proven (airport street pricing), political support is overwhelming (73% bipartisan), federal momentum is building (HOTDOG Act), and Philadelphia City Council has demonstrated willingness to attach conditions to stadium subsidies (prevailing wage ordinance). Campaign target: Fair Concession Pricing Ordinance capping prices at 150% of local retail at publicly-subsidised venues.",
+        dataSources: [
+          {
+            sourceId: "phila-council-legislation",
+            detail: "Legistar: Prevailing wage ordinance (2019) established precedent for attaching labour conditions to publicly-subsidised venues including Lincoln Financial Field. No concession pricing legislation currently filed — gap in representation confirmed.",
+          },
+          {
+            sourceId: "federal-register",
+            detail: "HOTDOG Act (H.R. introduced Dec 2025) directs FTC to study pricing practices at publicly-subsidised stadiums. Bipartisan sponsors. Creates federal policy window for local action.",
+          },
+          {
+            sourceId: "phila-inquirer",
+            detail: "23 articles on stadium concession costs in past 90 days. Coverage intensified during FIFA Club World Cup ($10 water bottles). Framing consistently consumer-advocacy oriented.",
+          },
+          {
+            sourceId: "whyy",
+            detail: "4 segments on stadium affordability. Interview with Groundwork Collaborative researchers. Coverage links concession pricing to broader cost-of-living crisis framing.",
+          },
+          {
+            sourceId: "billy-penn",
+            detail: "6 articles. Fan-experience framing. Comments sections averaging 200+ responses with overwhelmingly negative sentiment toward pricing.",
+          },
+          {
+            sourceId: "x-philly-trends",
+            detail: "Eagles fan accounts posting concession receipts: viral engagement averaging 2,500+ interactions per post. #LincolnFinancialRipoff trending locally during game days.",
+          },
+          {
+            sourceId: "reddit-philadelphia",
+            detail: "r/philadelphia and r/eagles stadium pricing threads: 18 posts with 300+ comments in past 60 days. Top comments reference airport pricing rules. Sentiment 89% negative toward current prices.",
+          },
+        ],
+        timestamp: "27m ago",
+      },
+      {
         id: 0,
         confidence: 84,
         severity: "critical",
@@ -932,6 +994,7 @@ const MARKETS = {
       },
     ],
     recentAlerts: [
+      { text: "HOTDOG Act co-sponsor references Philadelphia stadium pricing in floor remarks", time: "27m ago", severity: "critical" },
       { text: "Emergency City Council session on property tax called", time: "18m ago", severity: "critical" },
       { text: "SEPTA ridership report shows steeper decline than projected", time: "1h ago", severity: "high" },
       { text: "Mayor's office press briefing on public safety metrics", time: "3h ago", severity: "medium" },
@@ -947,9 +1010,9 @@ const MARKETS = {
     timezone: "CET (UTC+1)",
     lang: "no",
     translationActive: true,
-    weatherCondition: "clear",
-    weatherLabel: "Clear Skies",
-    stabilityIndex: 81,
+    signalLevel: "low",
+    signalLabel: "Low Misalignment",
+    misalignmentScore: 81,
     trendDirection: "stable",
     trendDelta: +1.1,
     riskLevel: "low",
@@ -1147,9 +1210,9 @@ const MARKETS = {
     coords: "1.2921° S, 36.8219° E",
     timezone: "EAT (UTC+3)",
     lang: "sw/en",
-    weatherCondition: "turbulent",
-    weatherLabel: "Turbulent",
-    stabilityIndex: 44,
+    signalLevel: "critical",
+    signalLabel: "Critical Misalignment",
+    misalignmentScore: 44,
     trendDirection: "volatile",
     trendDelta: -8.7,
     riskLevel: "high",
@@ -1359,11 +1422,11 @@ const MARKETS = {
   },
 };
 
-const WEATHER_META = {
-  clear: { icon: "☀️", label: "Clear Skies", badgeBg: "#dcfce7", badgeText: "#166534", barColor: "#22c55e" },
-  partly_cloudy: { icon: "⛅", label: "Partly Cloudy", badgeBg: "#fef9c3", badgeText: "#854d0e", barColor: "#ca8a04" },
-  stormy: { icon: "⛈️", label: "Stormy", badgeBg: "#fee2e2", badgeText: "#991b1b", barColor: "#dc2626" },
-  turbulent: { icon: "🌪️", label: "Turbulent", badgeBg: "#ffedd5", badgeText: "#9a3412", barColor: "#ea580c" },
+const SIGNAL_META = {
+  low: { icon: "◈", label: "Low Misalignment", badgeBg: "#dcfce7", badgeText: "#166534", barColor: "#22c55e" },
+  moderate: { icon: "◆", label: "Moderate Misalignment", badgeBg: "#fef9c3", badgeText: "#854d0e", barColor: "#ca8a04" },
+  high: { icon: "⬥", label: "High Misalignment", badgeBg: "#fee2e2", badgeText: "#991b1b", barColor: "#dc2626" },
+  critical: { icon: "⬥", label: "Critical Misalignment", badgeBg: "#ffedd5", badgeText: "#9a3412", barColor: "#ea580c" },
 };
 
 const SEVERITY_STYLES = {
@@ -1453,7 +1516,7 @@ function MoodMeter({ label, value }) {
   );
 }
 
-function StabilityArc({ value, accent }) {
+function MisalignmentArc({ value, accent }) {
   const size = 140;
   const r = 54;
   const circ = Math.PI * r;
@@ -1469,7 +1532,7 @@ function StabilityArc({ value, accent }) {
       </svg>
       <div style={{ marginTop: -18, textAlign: "center" }}>
         <div style={{ fontSize: 32, fontWeight: 800, color: col, fontFamily: "'IBM Plex Mono', monospace", lineHeight: 1 }}>{value}</div>
-        <div style={{ fontSize: 9, color: P.textTertiary, letterSpacing: 2, textTransform: "uppercase", marginTop: 4 }}>Stability Index</div>
+        <div style={{ fontSize: 9, color: P.textTertiary, letterSpacing: 2, textTransform: "uppercase", marginTop: 4 }}>Misalignment Score</div>
       </div>
     </div>
   );
@@ -1510,7 +1573,7 @@ function SourceDetailCard({ sourceId, detail }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function DashboardView({ market, onTopicClick, onInsightExpand, expandedInsight, dataView, setDataView }) {
-  const w = WEATHER_META[market.weatherCondition];
+  const w = SIGNAL_META[market.signalLevel];
   const trendColor = market.trendDelta > 0 ? "#16a34a" : market.trendDelta < -8 ? "#dc2626" : "#ca8a04";
   const trendArrow = market.trendDelta > 0 ? "↑" : market.trendDelta < -5 ? "↓" : "→";
   const allSourceIds = [
@@ -1524,7 +1587,7 @@ function DashboardView({ market, onTopicClick, onInsightExpand, expandedInsight,
     <div>
       {/* Hero row */}
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 1fr", gap: 16, marginBottom: 20 }}>
-        {/* Weather card */}
+        {/* Signal card */}
         <div style={{
           background: P.surface, border: `1px solid ${P.border}`, borderRadius: 12, padding: 24,
           display: "flex", alignItems: "center", gap: 20,
@@ -1549,12 +1612,12 @@ function DashboardView({ market, onTopicClick, onInsightExpand, expandedInsight,
           </div>
         </div>
 
-        {/* Stability */}
+        {/* Misalignment Score */}
         <div style={{
           background: P.surface, border: `1px solid ${P.border}`, borderRadius: 12, padding: 20,
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         }}>
-          <StabilityArc value={market.stabilityIndex} accent={market.accentColor} />
+          <MisalignmentArc value={market.misalignmentScore} accent={market.accentColor} />
         </div>
 
         {/* Sources */}
@@ -1786,15 +1849,15 @@ function DashboardView({ market, onTopicClick, onInsightExpand, expandedInsight,
               All Markets
             </div>
             {Object.values(MARKETS).map((m) => {
-              const mw = WEATHER_META[m.weatherCondition];
+              const mw = SIGNAL_META[m.signalLevel];
               return (
                 <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 6px", borderRadius: 6, marginBottom: 2, background: m.id === market.id ? P.surfaceAlt : "transparent" }}>
                   <span style={{ fontSize: 15 }}>{m.flag}</span>
                   <div style={{ flex: 1, fontSize: 12, fontWeight: m.id === market.id ? 600 : 400, color: m.id === market.id ? P.text : P.textSecondary }}>{m.name}</div>
                   <div style={{ width: 44, height: 4, borderRadius: 2, background: P.borderLight, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${m.stabilityIndex}%`, background: mw.barColor, borderRadius: 2 }} />
+                    <div style={{ height: "100%", width: `${m.misalignmentScore}%`, background: mw.barColor, borderRadius: 2 }} />
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: mw.barColor, fontFamily: "'IBM Plex Mono', monospace", minWidth: 22, textAlign: "right" }}>{m.stabilityIndex}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: mw.barColor, fontFamily: "'IBM Plex Mono', monospace", minWidth: 22, textAlign: "right" }}>{m.misalignmentScore}</span>
                 </div>
               );
             })}
@@ -2123,10 +2186,10 @@ function App() {
               margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: -0.5,
               color: P.text, fontFamily: "'IBM Plex Mono', monospace",
             }}>
-              TRMNL 2
+              Class Action Campaign Platform
             </h1>
             <span style={{ fontSize: 13, color: P.textTertiary, fontFamily: "'Source Serif 4', Georgia, serif", fontStyle: "italic" }}>
-              Local Weather Reports
+              Political Intelligence
             </span>
           </div>
 
@@ -2157,7 +2220,7 @@ function App() {
       <div style={{ background: P.surface, borderBottom: `1px solid ${P.border}`, padding: "0 32px" }}>
         <div style={{ maxWidth: 1360, margin: "0 auto", display: "flex", gap: 4, padding: "10px 0", overflowX: "auto" }}>
           {Object.values(MARKETS).map((m) => {
-            const mw = WEATHER_META[m.weatherCondition];
+            const mw = SIGNAL_META[m.signalLevel];
             const isActive = m.id === activeMarket;
             return (
               <button
@@ -2206,7 +2269,7 @@ function App() {
       {/* Footer */}
       <footer style={{ borderTop: `1px solid ${P.border}`, padding: "16px 32px", background: P.surface }}>
         <div style={{ maxWidth: 1360, margin: "0 auto", display: "flex", justifyContent: "space-between", fontSize: 11, color: P.textTertiary }}>
-          <span>TRMNL 2 — All listed data sources are publicly accessible and automatable via web scraping, RSS, or official APIs.</span>
+          <span>Class Action Campaign Platform — All listed data sources are publicly accessible and automatable via web scraping, RSS, or official APIs.</span>
           <span>MVP Prototype • 4 Markets • {Object.keys(SOURCE_REGISTRY).length} Verified Sources</span>
         </div>
       </footer>
